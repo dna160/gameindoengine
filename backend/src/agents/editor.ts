@@ -149,7 +149,7 @@ You must declare the topic unsalvageable. Do NOT send it back to the Copywriter.
       // Image URLs and alt text are already included in the prompt above as plain text.
       const raw = await chat(
         [{ role: 'user', content: prompt }],
-        { temperature: 0.2, maxTokens: 700 }
+        { temperature: 0.2, maxTokens: 1024 }
       );
 
       const result = parseJsonResponse<{

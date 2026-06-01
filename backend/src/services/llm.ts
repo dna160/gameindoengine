@@ -33,7 +33,9 @@ interface DeepSeekResponse {
   choices: DeepSeekChoice[];
 }
 
-// ── Rate limiter: 60 requests per minute (sliding window) ─────────────────────
+// ── Rate limiter ──────────────────────────────────────────────────────────────
+// DeepSeek Flash supports 2500 concurrent requests — match it so the pipeline
+// runs at full speed instead of being artificially throttled.
 
 class RateLimiter {
   private queue: Array<() => void> = [];
@@ -67,7 +69,6 @@ class RateLimiter {
         setImmediate(() => this.process());
       }
     } else {
-      // Wait until the oldest timestamp exits the 60s window
       const waitMs = this.timestamps[0] - windowStart + 1;
       if (!this.timer) {
         this.timer = setTimeout(() => {
@@ -79,11 +80,11 @@ class RateLimiter {
   }
 }
 
-const rateLimiter = new RateLimiter(60);
+const rateLimiter = new RateLimiter(2500);
 
 // ── Timeout helper ────────────────────────────────────────────────────────────
 
-const CHAT_TIMEOUT_MS = 90_000; // 90 seconds — kills hanging API calls
+const CHAT_TIMEOUT_MS = 120_000; // 2 minutes
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
@@ -99,9 +100,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 // ── Core HTTP client ──────────────────────────────────────────────────────────
 
 /**
- * Send a chat completion request to DeepSeek V4 Flash.
- * Supports both text-only and multimodal (vision) messages.
- * Returns the raw API response so callers can inspect choices directly.
+ * Low-level HTTP call to DeepSeek's chat completions endpoint.
+ * Use chat() for all standard calls — it adds rate limiting, retry, and
+ * automatic token-doubling on truncation.
  */
 export async function createCompletion(params: {
   model: string;
@@ -116,10 +117,10 @@ export async function createCompletion(params: {
       Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
     },
     body: JSON.stringify({
-      model: params.model,
-      messages: params.messages,
+      model:       params.model,
+      messages:    params.messages,
       temperature: params.temperature ?? 0.7,
-      max_tokens: params.max_tokens ?? 2048,
+      max_tokens:  params.max_tokens  ?? 4096,
     }),
   });
 
@@ -131,45 +132,71 @@ export async function createCompletion(params: {
   return res.json() as Promise<DeepSeekResponse>;
 }
 
-// ── High-level helpers ────────────────────────────────────────────────────────
+// ── High-level chat helper ────────────────────────────────────────────────────
+
+const MAX_TOKENS_CAP   = 8192; // never exceed DeepSeek Flash's output limit
+const MAX_ATTEMPTS     = 4;    // up to 3 token-doubling retries + 1 empty retry
 
 /**
  * Send a chat completion request to DeepSeek V4 Flash and return the text content.
- * Retries once on empty content before throwing.
+ *
+ * Automatic retry strategy:
+ *   - finish_reason=length (truncated): doubles max_tokens and retries (up to MAX_TOKENS_CAP)
+ *   - empty content: retries up to 3 times with the same token budget
+ *   - timeout / API error: propagates immediately (caller's try/catch handles it)
  */
 export async function chat(
   messages: ChatMessage[],
   opts: { temperature?: number; maxTokens?: number } = {}
 ): Promise<string> {
-  const maxTokens = opts.maxTokens ?? 2048;
+  let maxTokens = opts.maxTokens ?? 4096;
 
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     await rateLimiter.acquire();
-    const response = await withTimeout(
-      createCompletion({
-        model: MODEL,
-        messages,
-        temperature: opts.temperature ?? 0.7,
-        max_tokens: maxTokens,
-      }),
-      CHAT_TIMEOUT_MS,
-      'chat'
-    );
+
+    let response: DeepSeekResponse;
+    try {
+      response = await withTimeout(
+        createCompletion({
+          model:       MODEL,
+          messages,
+          temperature: opts.temperature ?? 0.7,
+          max_tokens:  maxTokens,
+        }),
+        CHAT_TIMEOUT_MS,
+        `chat attempt ${attempt}`
+      );
+    } catch (err) {
+      // Timeout or network error — propagate immediately, don't retry
+      throw err;
+    }
 
     const choice       = response.choices[0];
     const content      = choice?.message?.content;
     const finishReason = choice?.finish_reason;
 
+    // Truncated response — double the token budget and retry
     if (finishReason === 'length') {
-      throw new Error(
-        `DeepSeek response truncated (finish_reason=length, max_tokens=${maxTokens}). ` +
-        `Increase maxTokens for this call.`
+      const next = Math.min(maxTokens * 2, MAX_TOKENS_CAP);
+      console.warn(
+        `[llm] Response truncated (finish_reason=length, tokens=${maxTokens}) — ` +
+        `retrying with ${next} tokens (attempt ${attempt}/${MAX_ATTEMPTS})`
       );
+      if (next === maxTokens) {
+        // Already at cap — nothing more we can do
+        throw new Error(
+          `DeepSeek response still truncated at max token cap (${MAX_TOKENS_CAP}). ` +
+          `Consider shortening the prompt.`
+        );
+      }
+      maxTokens = next;
+      continue;
     }
 
+    // Empty content — retry with the same settings
     if (!content) {
-      if (attempt < 2) {
-        console.warn(`[llm] Empty response from DeepSeek (attempt ${attempt}) — retrying…`);
+      if (attempt < MAX_ATTEMPTS) {
+        console.warn(`[llm] Empty response from DeepSeek (attempt ${attempt}/${MAX_ATTEMPTS}) — retrying…`);
         continue;
       }
       throw new Error(`DeepSeek returned empty response after ${attempt} attempt(s)`);
@@ -178,22 +205,20 @@ export async function chat(
     return content.trim();
   }
 
-  // Should never reach here
-  throw new Error('DeepSeek chat: unexpected exit from retry loop');
+  throw new Error('DeepSeek chat: exhausted all retry attempts');
 }
 
+// ── Image availability check ──────────────────────────────────────────────────
+
 /**
- * Evaluate whether an image URL is accessible and usable.
- *
- * DeepSeek V4 Flash does not support multimodal/vision inputs, so visual
- * relevance cannot be assessed via the LLM. Instead we perform an HTTP HEAD
- * check — if the image loads (2xx), it is approved. Semantic relevance
- * filtering is handled downstream by the Editor's alt-text and URL review.
+ * Check whether an image URL is accessible (HTTP 2xx).
+ * DeepSeek V4 Flash does not support vision — relevance is evaluated
+ * downstream by the Editor's alt-text review.
  */
 export async function evaluateImageRelevance(
   imageUrl: string,
-  _topic: string,
-  _pillar: string
+  _topic:   string,
+  _pillar:  string
 ): Promise<boolean> {
   try {
     const controller = new AbortController();
@@ -206,8 +231,10 @@ export async function evaluateImageRelevance(
   }
 }
 
+// ── JSON parsing helper ───────────────────────────────────────────────────────
+
 /**
- * Parse a JSON response from DeepSeek, stripping markdown code blocks if present.
+ * Parse a JSON response from DeepSeek, stripping markdown code fences if present.
  */
 export function parseJsonResponse<T>(raw: string): T {
   const cleaned = raw

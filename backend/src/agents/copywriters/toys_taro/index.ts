@@ -116,7 +116,7 @@ Output ONLY the article in markdown. No meta-commentary, no word count notes.`;
 
     const articleText = await chat(
       [{ role: 'user', content: prompt }],
-      { temperature: 0.75, maxTokens: 800 }
+      { temperature: 0.75, maxTokens: 4096 }
     );
 
     if (articleText.trim().startsWith('SYSTEM_ROUTE_TO_RESEARCHER')) {

@@ -54,7 +54,7 @@ Respond in JSON format:
 }`;
 
     try {
-      const raw = await chat([{ role: 'user', content: prompt }], { temperature: 0, maxTokens: 200 });
+      const raw = await chat([{ role: 'user', content: prompt }], { temperature: 0, maxTokens: 512 });
       const result = parseJsonResponse<{ approved: boolean; reason: string }>(raw);
       return result;
     } catch (err) {
@@ -86,7 +86,7 @@ Respond in JSON format:
 }`;
 
     try {
-      const raw = await chat([{ role: 'user', content: prompt }], { temperature: 0.3, maxTokens: 500 });
+      const raw = await chat([{ role: 'user', content: prompt }], { temperature: 0.3, maxTokens: 1024 });
 
       try {
         const result = parseJsonResponse<{ facts: string[] }>(raw);
