@@ -9,7 +9,7 @@
  * On adversarial editor FAIL, accepts targeted feedback and regenerates.
  */
 
-import { createCompletion, MODEL } from '../../../services/llm';
+import { chat, MODEL } from '../../../services/llm';
 import { HOOK_COPYWRITER_SYSTEM_PROMPT } from './prompt';
 
 export interface HookCopywriterOutput {
@@ -41,16 +41,13 @@ export class HookCopywriter {
       ...(feedback ? ['', '## Editor Feedback (address these issues in your revised output)', feedback] : []),
     ].join('\n');
 
-    const response = await createCompletion({
-      model:    MODEL,
-      messages: [
+    const raw = await chat(
+      [
         { role: 'system', content: HOOK_COPYWRITER_SYSTEM_PROMPT },
         { role: 'user',   content: userMessage },
       ],
-      temperature: 0.8,
-    });
-
-    const raw = response.choices[0]?.message?.content ?? '';
+      { temperature: 0.8, maxTokens: 1024 }
+    );
 
     let parsed: HookCopywriterOutput;
     try {

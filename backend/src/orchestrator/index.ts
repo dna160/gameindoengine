@@ -69,9 +69,10 @@ const MAX_SCOUT_ROUNDS    = 10;
 
 /**
  * How many published articles per pillar per pipeline run get sent through
- * the Social Media Coordinator pipeline.  3 × 5 pillars = 15 social posts max per run.
+ * the Social Media Coordinator pipeline.  10 × 5 pillars = 50 social posts max per run.
+ * Matches ARTICLES_PER_PILLAR so every published article gets a social post.
  */
-const MAX_SOCIAL_POSTS_PER_PILLAR = 3;
+const MAX_SOCIAL_POSTS_PER_PILLAR = 10;
 
 /** Consecutive empty Scout rounds before giving up on quota. */
 const MAX_SCOUT_EMPTY_ROUNDS = 3;
@@ -636,21 +637,33 @@ export class Orchestrator {
       }
 
       // ── Dispatch Copywriter ──────────────────────────────────────────────────
-      if (draft === null) {
-        draft = await copywriter.writeDraft({ ...item, images: currentImages });
-      } else {
-        // Rewrite — Orchestrator routes feedback back to the same Copywriter
+      try {
+        if (draft === null) {
+          draft = await copywriter.writeDraft({ ...item, images: currentImages });
+        } else {
+          // Rewrite — Orchestrator routes feedback back to the same Copywriter
+          this.addLog(
+            `Routing revision feedback back to ${personaName} (attempt ${attempt + 1}/${MAX_REVISION_LOOPS})`,
+            'info',
+            ORCHESTRATOR_IDENTITY
+          );
+          dispatchAgent(agentHandle, item.title, (msg) => this.addLog(msg, 'info', ORCHESTRATOR_IDENTITY));
+          draft = await copywriter.rewrite(
+            { ...item, images: currentImages },
+            lastEditorFeedback,
+            currentImages
+          );
+        }
+      } catch (err) {
         this.addLog(
-          `Routing revision feedback back to ${personaName} (attempt ${attempt + 1}/${MAX_REVISION_LOOPS})`,
-          'info',
+          `[${personaName}] Copywriter threw on attempt ${attempt + 1}: ${(err as Error).message} — marking FAILED`,
+          'warn',
           ORCHESTRATOR_IDENTITY
         );
-        dispatchAgent(agentHandle, item.title, (msg) => this.addLog(msg, 'info', ORCHESTRATOR_IDENTITY));
-        draft = await copywriter.rewrite(
-          { ...item, images: currentImages },
-          lastEditorFeedback,
-          currentImages
-        );
+        await updateArticleState(this.prisma, articleId, {
+          status: 'FAILED', revisionCount, editorNotes: (err as Error).message,
+        });
+        return 'FAILED';
       }
 
       // Copywriter routing signal: broken images → re-dispatch Researcher
@@ -949,7 +962,18 @@ export class Orchestrator {
 
       // Dispatch Researcher
       dispatchAgent('researcher', topic.title, (msg) => this.addLog(msg, 'info', ORCHESTRATOR_IDENTITY));
-      const researched = await this.researcher.researchItem(topic);
+      let researched;
+      try {
+        researched = await this.researcher.researchItem(topic);
+      } catch (err) {
+        this.addLog(
+          `Researcher threw for "${topic.title}": ${(err as Error).message} — skipping`,
+          'warn',
+          ORCHESTRATOR_IDENTITY
+        );
+        await this.scout.markProcessed(topic.link);
+        continue;
+      }
 
       if (!researched.approved) {
         this.addLog(
@@ -961,8 +985,21 @@ export class Orchestrator {
         continue;
       }
 
-      const articleId   = await this.createArticleRecord(topic);
-      const finalStatus = await this.processArticle(articleId, researched);
+      const articleId = await this.createArticleRecord(topic);
+      let finalStatus: 'GREEN' | 'YELLOW' | 'RED' | 'FAILED';
+      try {
+        finalStatus = await this.processArticle(articleId, researched);
+      } catch (err) {
+        this.addLog(
+          `processArticle threw for "${topic.title}": ${(err as Error).message} — marking FAILED`,
+          'warn',
+          ORCHESTRATOR_IDENTITY
+        );
+        await updateArticleState(this.prisma, articleId, {
+          status: 'FAILED', revisionCount: 0, editorNotes: (err as Error).message,
+        });
+        finalStatus = 'FAILED';
+      }
       await this.scout.markProcessed(topic.link);
 
       this.addLog(

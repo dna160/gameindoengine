@@ -11,11 +11,9 @@
  * On PASS: hands off to the Publisher.
  */
 
-import { createCompletion } from '../../../services/llm';
+import { chat } from '../../../services/llm';
 import { ADVERSARIAL_EDITOR_SYSTEM_PROMPT } from './prompt';
 
-// DeepSeek V4 Flash — text-only review (vision not supported)
-const REVIEW_MODEL = 'deepseek-v4-flash';
 
 export interface EditorVerdict {
   verdict:                     'PASS' | 'FAIL';
@@ -43,34 +41,25 @@ export class AdversarialEditor {
     // Vision is not supported by DeepSeek V4 Flash.
     // We evaluate caption logic and topic relevance from text alone.
     // Image composition criteria (contrast, crop, brand frame) are auto-passed.
-    const response = await createCompletion({
-      model: REVIEW_MODEL,
-      messages: [
-        { role: 'system', content: ADVERSARIAL_EDITOR_SYSTEM_PROMPT },
-        {
-          role:    'user',
-          content: [
-            {
-              type: 'text',
-              text: [
-                `Image Copy Text (rendered on the image): "${imageCopy}"`,
-                '',
-                `Caption:`,
-                caption,
-                '',
-                'NOTE: Image files are not available for review. Auto-pass criteria 1–3',
-                '(contrast, crop, brand frame). Evaluate criteria 4 (caption logic) and',
-                '5 (topic relevance inferred from image_copy) only.',
-                'Return your verdict JSON.',
-              ].join('\n'),
-            },
-          ],
-        },
-      ],
-      temperature: 0.3,
-    });
+    const userText = [
+      `Image Copy Text (rendered on the image): "${imageCopy}"`,
+      '',
+      `Caption:`,
+      caption,
+      '',
+      'NOTE: Image files are not available for review. Auto-pass criteria 1–3',
+      '(contrast, crop, brand frame). Evaluate criteria 4 (caption logic) and',
+      '5 (topic relevance inferred from image_copy) only.',
+      'Return your verdict JSON.',
+    ].join('\n');
 
-    const raw = response.choices[0]?.message?.content ?? '';
+    const raw = await chat(
+      [
+        { role: 'system', content: ADVERSARIAL_EDITOR_SYSTEM_PROMPT },
+        { role: 'user',   content: userText },
+      ],
+      { temperature: 0.3, maxTokens: 512 }
+    );
 
     let parsed: EditorVerdict;
     try {
