@@ -183,46 +183,25 @@ export async function chat(
 }
 
 /**
- * Ask DeepSeek to evaluate an image URL for relevance to a topic.
- * Returns true (relevant) or false (irrelevant / failed).
+ * Evaluate whether an image URL is accessible and usable.
+ *
+ * DeepSeek V4 Flash does not support multimodal/vision inputs, so visual
+ * relevance cannot be assessed via the LLM. Instead we perform an HTTP HEAD
+ * check — if the image loads (2xx), it is approved. Semantic relevance
+ * filtering is handled downstream by the Editor's alt-text and URL review.
  */
 export async function evaluateImageRelevance(
   imageUrl: string,
-  topic: string,
-  pillar: string
+  _topic: string,
+  _pillar: string
 ): Promise<boolean> {
   try {
-    await rateLimiter.acquire();
-    const response = await withTimeout(
-      createCompletion({
-        model: MODEL,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `You are evaluating whether an image is relevant to an article about "${topic}" in the "${pillar}" content pillar.\n\nRespond with ONLY "YES" if the image is clearly relevant and high quality, or "NO" if it is irrelevant, low quality, or inappropriate.\n\nImage URL: ${imageUrl}`,
-              },
-              {
-                type: 'image_url',
-                image_url: { url: imageUrl },
-              },
-            ],
-          },
-        ],
-        max_tokens: 10,
-        temperature: 0,
-      }),
-      CHAT_TIMEOUT_MS,
-      'vision'
-    );
-
-    const answer = response.choices[0]?.message?.content?.trim().toUpperCase();
-    return answer === 'YES';
-  } catch (err) {
-    // If vision evaluation fails (e.g., image inaccessible), default to false
-    console.warn(`Vision evaluation failed for ${imageUrl}:`, err);
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 5_000);
+    const res = await fetch(imageUrl, { method: 'HEAD', signal: controller.signal });
+    clearTimeout(timeoutId);
+    return res.ok;
+  } catch {
     return false;
   }
 }

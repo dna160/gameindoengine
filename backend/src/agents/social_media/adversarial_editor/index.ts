@@ -1,33 +1,21 @@
 /**
  * Agent 3: Adversarial Editor (Quality Assurance)
  *
- * Acts as a ruthless Social Media Manager. Reviews the final composed images
- * (Post + Story with frame and text overlay) and the caption using DeepSeek Vision.
+ * Acts as a ruthless Social Media Manager. Reviews the caption and image_copy
+ * text for quality using DeepSeek. Image composition review is skipped because
+ * DeepSeek V4 Flash does not support multimodal/vision inputs — criteria 1–3
+ * (contrast, crop, brand safety) are auto-passed; only text-based criteria
+ * 4 (caption logic) and 5 (topic relevance from image_copy) are evaluated.
  *
- * Evaluation criteria:
- *   1. Legibility  — is the image_copy text readable on the image?
- *   2. Framing     — is the crop well-composed? No decapitated subjects?
- *   3. Brand Safety — is the Popshck frame visible and correct?
- *   4. Copy QA     — is the caption well-formed, in Indonesian, with hashtags?
- *
- * On FAIL: returns targeted feedback for the copywriter and/or frame generator.
+ * On FAIL: returns targeted feedback for the copywriter.
  * On PASS: hands off to the Publisher.
  */
 
-import sharp from 'sharp';
 import { createCompletion } from '../../../services/llm';
 import { ADVERSARIAL_EDITOR_SYSTEM_PROMPT } from './prompt';
 
-// DeepSeek V4 Flash — vision-capable for image QA review
-const VISION_MODEL = 'deepseek-v4-flash';
-
-/** Resize a PNG buffer to a smaller JPEG for vision-model review. */
-async function resizeForReview(buffer: Buffer, width: number, height: number): Promise<Buffer> {
-  return sharp(buffer)
-    .resize(width, height, { fit: 'fill' })
-    .jpeg({ quality: 85 })
-    .toBuffer();
-}
+// DeepSeek V4 Flash — text-only review (vision not supported)
+const REVIEW_MODEL = 'deepseek-v4-flash';
 
 export interface EditorVerdict {
   verdict:                     'PASS' | 'FAIL';
@@ -48,19 +36,15 @@ export class AdversarialEditor {
     caption:          string;
     imageCopy:        string;
   }): Promise<EditorVerdict> {
-    const { postImageBuffer, storyImageBuffer, caption, imageCopy } = params;
+    const { caption, imageCopy } = params;
 
-    this.log('[AdversarialEditor] Reviewing rendered images and caption…');
+    this.log('[AdversarialEditor] Reviewing caption and image copy (text-only — vision unavailable)…');
 
-    // Downsample to 540px wide before encoding — reduces base64 payload ~4×
-    // and prevents the vision model from hallucinating artifacts in compressed data.
-    const postSmall  = await resizeForReview(postImageBuffer,  540,  540);
-    const storySmall = await resizeForReview(storyImageBuffer, 540,  960);
-    const postDataUrl  = `data:image/jpeg;base64,${postSmall.toString('base64')}`;
-    const storyDataUrl = `data:image/jpeg;base64,${storySmall.toString('base64')}`;
-
+    // Vision is not supported by DeepSeek V4 Flash.
+    // We evaluate caption logic and topic relevance from text alone.
+    // Image composition criteria (contrast, crop, brand frame) are auto-passed.
     const response = await createCompletion({
-      model: VISION_MODEL,
+      model: REVIEW_MODEL,
       messages: [
         { role: 'system', content: ADVERSARIAL_EDITOR_SYSTEM_PROMPT },
         {
@@ -69,21 +53,16 @@ export class AdversarialEditor {
             {
               type: 'text',
               text: [
-                `Image Copy Text (should appear on both images): "${imageCopy}"`,
+                `Image Copy Text (rendered on the image): "${imageCopy}"`,
                 '',
                 `Caption:`,
                 caption,
                 '',
-                'Review both images below and return your verdict JSON.',
+                'NOTE: Image files are not available for review. Auto-pass criteria 1–3',
+                '(contrast, crop, brand frame). Evaluate criteria 4 (caption logic) and',
+                '5 (topic relevance inferred from image_copy) only.',
+                'Return your verdict JSON.',
               ].join('\n'),
-            },
-            {
-              type:      'image_url',
-              image_url: { url: postDataUrl },
-            },
-            {
-              type:      'image_url',
-              image_url: { url: storyDataUrl },
             },
           ],
         },
@@ -98,7 +77,6 @@ export class AdversarialEditor {
       parsed = JSON.parse(raw) as EditorVerdict;
     } catch {
       // If the editor fails to return valid JSON, treat as a soft pass
-      // (we cannot let a broken editor block publication indefinitely)
       this.log(`[AdversarialEditor] ⚠ Could not parse verdict JSON — defaulting to PASS. Raw: ${raw}`);
       return {
         verdict:                      'PASS',

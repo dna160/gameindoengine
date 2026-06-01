@@ -11,12 +11,7 @@
  * Returns two rendered Buffers: Post (1:1) and Story (9:16).
  */
 
-import { createCompletion } from '../../../services/llm';
-import { FOCAL_POINT_SYSTEM_PROMPT } from './prompt';
 import { processImage } from './tools/image_processor';
-
-// DeepSeek V4 Flash — vision-capable for focal point analysis
-const VISION_MODEL = 'deepseek-v4-flash';
 
 interface FocalPoint {
   focal_x_pct:  number;
@@ -65,40 +60,12 @@ export class FrameGenerator {
   // ── Private helpers ─────────────────────────────────────────────────────────
 
   private async analyseFocalPoint(imageUrl: string, feedback?: string): Promise<FocalPoint> {
-    const userText = feedback
-      ? `Analyse this image and return the focal point JSON.\n\nNote from previous review: ${feedback}\nAdjust your focal point recommendation accordingly.`
-      : 'Analyse this image and return the focal point JSON.';
-
-    const response = await createCompletion({
-      model: VISION_MODEL,
-      messages: [
-        { role: 'system', content: FOCAL_POINT_SYSTEM_PROMPT },
-        {
-          role:    'user',
-          content: [
-            { type: 'text',      text: userText },
-            { type: 'image_url', image_url: { url: imageUrl } },
-          ],
-        },
-      ],
-      temperature: 0.2,
-    });
-
-    const raw = response.choices[0]?.message?.content ?? '';
-
-    let parsed: FocalPoint;
-    try {
-      parsed = JSON.parse(raw) as FocalPoint;
-    } catch {
-      throw new Error(
-        `[FrameGenerator] Failed to parse focal point JSON.\nRaw output:\n${raw}`
-      );
-    }
-
-    // Clamp values to valid range
-    parsed.focal_x_pct = Math.max(0, Math.min(1, parsed.focal_x_pct ?? 0.5));
-    parsed.focal_y_pct = Math.max(0, Math.min(1, parsed.focal_y_pct ?? 0.4));
-
-    return parsed;
+    // DeepSeek V4 Flash does not support multimodal/vision inputs.
+    // Fall back to a sensible centre-weighted default focal point.
+    // This matches the --skip-vision behaviour used in test scripts.
+    this.log('[FrameGenerator] Vision not supported by current model — using centre focal point (0.5, 0.4)');
+    void imageUrl; // suppress unused-variable warning
+    void feedback;
+    return { focal_x_pct: 0.5, focal_y_pct: 0.4, description: 'centre (vision unavailable)' };
   }
 }
