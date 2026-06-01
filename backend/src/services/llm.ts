@@ -6,10 +6,10 @@ if (!process.env.DEEPSEEK_API_KEY) {
   throw new Error('DEEPSEEK_API_KEY environment variable is required');
 }
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY!;
-const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
+const DEEPSEEK_API_KEY  = process.env.DEEPSEEK_API_KEY!;
+const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL ?? 'https://api.deepseek.com';
 
-export const MODEL = 'deepseek-v4-flash';
+export const MODEL = process.env.DEEPSEEK_MODEL ?? 'deepseek-v4-flash';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
