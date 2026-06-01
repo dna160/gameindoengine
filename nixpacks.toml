@@ -12,4 +12,4 @@ cmds = [
 ]
 
 [start]
-cmd = "node backend/dist/server.js"
+cmd = "npx prisma db push --schema=backend/prisma/schema.prisma --accept-data-loss && node backend/dist/server.js"
