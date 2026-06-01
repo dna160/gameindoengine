@@ -495,7 +495,7 @@ Respond ONLY with the JSON object.`;
     try {
       const raw = await chat(
         [{ role: 'user', content: prompt }],
-        { temperature: 0, maxTokens: 400 }
+        { temperature: 0, maxTokens: 1024 }
       );
 
       const result = parseJsonResponse<{

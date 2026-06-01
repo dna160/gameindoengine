@@ -26,6 +26,7 @@ interface DeepSeekChoice {
   message: {
     content: string | null;
   };
+  finish_reason: 'stop' | 'length' | 'content_filter' | string | null;
 }
 
 interface DeepSeekResponse {
@@ -134,28 +135,51 @@ export async function createCompletion(params: {
 
 /**
  * Send a chat completion request to DeepSeek V4 Flash and return the text content.
+ * Retries once on empty content before throwing.
  */
 export async function chat(
   messages: ChatMessage[],
   opts: { temperature?: number; maxTokens?: number } = {}
 ): Promise<string> {
-  await rateLimiter.acquire();
-  const response = await withTimeout(
-    createCompletion({
-      model: MODEL,
-      messages,
-      temperature: opts.temperature ?? 0.7,
-      max_tokens: opts.maxTokens ?? 2048,
-    }),
-    CHAT_TIMEOUT_MS,
-    'chat'
-  );
+  const maxTokens = opts.maxTokens ?? 2048;
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error('DeepSeek returned empty response');
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    await rateLimiter.acquire();
+    const response = await withTimeout(
+      createCompletion({
+        model: MODEL,
+        messages,
+        temperature: opts.temperature ?? 0.7,
+        max_tokens: maxTokens,
+      }),
+      CHAT_TIMEOUT_MS,
+      'chat'
+    );
+
+    const choice       = response.choices[0];
+    const content      = choice?.message?.content;
+    const finishReason = choice?.finish_reason;
+
+    if (finishReason === 'length') {
+      throw new Error(
+        `DeepSeek response truncated (finish_reason=length, max_tokens=${maxTokens}). ` +
+        `Increase maxTokens for this call.`
+      );
+    }
+
+    if (!content) {
+      if (attempt < 2) {
+        console.warn(`[llm] Empty response from DeepSeek (attempt ${attempt}) — retrying…`);
+        continue;
+      }
+      throw new Error(`DeepSeek returned empty response after ${attempt} attempt(s)`);
+    }
+
+    return content.trim();
   }
-  return content.trim();
+
+  // Should never reach here
+  throw new Error('DeepSeek chat: unexpected exit from retry loop');
 }
 
 /**
