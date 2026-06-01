@@ -2,7 +2,7 @@
  * Agent 3: Adversarial Editor (Quality Assurance)
  *
  * Acts as a ruthless Social Media Manager. Reviews the final composed images
- * (Post + Story with frame and text overlay) and the caption using Grok Vision.
+ * (Post + Story with frame and text overlay) and the caption using DeepSeek Vision.
  *
  * Evaluation criteria:
  *   1. Legibility  — is the image_copy text readable on the image?
@@ -15,10 +15,11 @@
  */
 
 import sharp from 'sharp';
-import { llmClient } from '../../../services/llm';
+import { createCompletion } from '../../../services/llm';
 import { ADVERSARIAL_EDITOR_SYSTEM_PROMPT } from './prompt';
 
-const VISION_MODEL = 'grok-4-fast-non-reasoning';
+// DeepSeek V4 Flash — vision-capable for image QA review
+const VISION_MODEL = 'deepseek-v4-flash';
 
 /** Resize a PNG buffer to a smaller JPEG for vision-model review. */
 async function resizeForReview(buffer: Buffer, width: number, height: number): Promise<Buffer> {
@@ -58,7 +59,7 @@ export class AdversarialEditor {
     const postDataUrl  = `data:image/jpeg;base64,${postSmall.toString('base64')}`;
     const storyDataUrl = `data:image/jpeg;base64,${storySmall.toString('base64')}`;
 
-    const response = await llmClient.chat.completions.create({
+    const response = await createCompletion({
       model: VISION_MODEL,
       messages: [
         { role: 'system', content: ADVERSARIAL_EDITOR_SYSTEM_PROMPT },

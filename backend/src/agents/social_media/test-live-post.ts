@@ -11,7 +11,7 @@
  *   --url <url>       WordPress article URL (required)
  *   --pillar <name>   anime | gaming | infotainment | manga | toys  (auto-detected if omitted)
  *   --dry-run         Generate images but do NOT post to Instagram
- *   --skip-vision     Use centre focal point instead of Grok Vision (faster)
+ *   --skip-vision     Use centre focal point instead of DeepSeek Vision (faster)
  */
 
 import * as fs   from 'fs';
@@ -238,7 +238,7 @@ async function main(): Promise<void> {
     postBuffer  = result.postBuffer;
     storyBuffer = result.storyBuffer;
   } else {
-    log('Calling Grok Vision for focal point…');
+    log('Calling DeepSeek Vision for focal point…');
     const frameGen = new FrameGenerator(log);
     const result = await frameGen.generate({ featuredImageUrl: imageUrl, imageCopy: copy.image_copy, pillar });
     postBuffer  = result.postBuffer;

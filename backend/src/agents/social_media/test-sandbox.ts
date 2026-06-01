@@ -14,14 +14,14 @@
  * Flags:
  *   --pillar <name>   anime | gaming | infotainment | manga | toys  (default: anime)
  *   --image  <url>    Source image URL to process (default: built-in test URL per pillar)
- *   --skip-vision     Use a centre focal point instead of calling Grok Vision (faster/offline)
+ *   --skip-vision     Use a centre focal point instead of calling DeepSeek Vision (faster/offline)
  */
 
 import * as fs   from 'fs';
 import * as path from 'path';
 import dotenv    from 'dotenv';
 
-// Load .env before importing any agent (llmClient reads XAI_API_KEY at import time)
+// Load .env before importing any agent (llm.ts reads DEEPSEEK_API_KEY at import time)
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 import { HookCopywriter }    from './hook_copywriter/index';
@@ -158,8 +158,8 @@ async function main(): Promise<void> {
   let storyBuffer: Buffer;
 
   if (SKIP_VISION) {
-    // Bypass Grok Vision — use centre focal point for fast local testing
-    log('--skip-vision: using centre focal point (0.5, 0.4), skipping Grok Vision call');
+    // Bypass DeepSeek Vision — use centre focal point for fast local testing
+    log('--skip-vision: using centre focal point (0.5, 0.4), skipping DeepSeek Vision call');
     const result = await processImage({
       imageUrl:  IMAGE_URL,
       imageCopy: copywriterOutput.image_copy,
@@ -170,7 +170,7 @@ async function main(): Promise<void> {
     postBuffer  = result.postBuffer;
     storyBuffer = result.storyBuffer;
   } else {
-    log('Calling Grok Vision to identify focal point…');
+    log('Calling DeepSeek Vision to identify focal point…');
     const frameGen = new FrameGenerator(log);
     const result = await frameGen.generate({
       featuredImageUrl: IMAGE_URL,
@@ -200,7 +200,7 @@ async function main(): Promise<void> {
   // ── Step 3: Adversarial Editor ──────────────────────────────────────────────
   separator('STEP 3 — Adversarial Editor (QA Review)');
 
-  log('Sending rendered images to Grok Vision for QA review…');
+  log('Sending rendered images to DeepSeek Vision for QA review…');
   const editor  = new AdversarialEditor(log);
   const verdict = await editor.review({
     postImageBuffer:  postBuffer,

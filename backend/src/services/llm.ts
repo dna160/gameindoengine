@@ -1,25 +1,38 @@
-import OpenAI from 'openai';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-if (!process.env.XAI_API_KEY) {
-  throw new Error('XAI_API_KEY environment variable is required');
+if (!process.env.DEEPSEEK_API_KEY) {
+  throw new Error('DEEPSEEK_API_KEY environment variable is required');
 }
 
-export const llmClient = new OpenAI({
-  apiKey: process.env.XAI_API_KEY,
-  baseURL: 'https://api.x.ai/v1',
-});
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY!;
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 
-export const MODEL = 'grok-4-1-fast-reasoning';
+export const MODEL = 'deepseek-v4-flash';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string | OpenAI.ChatCompletionContentPart[];
+  content: string | ContentPart[];
 }
 
-// ── Rate limiter: 900 requests per minute (sliding window) ────────────────────
+interface DeepSeekChoice {
+  message: {
+    content: string | null;
+  };
+}
+
+interface DeepSeekResponse {
+  choices: DeepSeekChoice[];
+}
+
+// ── Rate limiter: 60 requests per minute (sliding window) ─────────────────────
 
 class RateLimiter {
   private queue: Array<() => void> = [];
@@ -65,22 +78,62 @@ class RateLimiter {
   }
 }
 
-const rateLimiter = new RateLimiter(900);
+const rateLimiter = new RateLimiter(60);
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Timeout helper ────────────────────────────────────────────────────────────
 
 const CHAT_TIMEOUT_MS = 90_000; // 90 seconds — kills hanging API calls
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`LLM request timed out after ${ms}ms (${label})`)), ms);
+    timer = setTimeout(
+      () => reject(new Error(`DeepSeek request timed out after ${ms}ms (${label})`)),
+      ms
+    );
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+// ── Core HTTP client ──────────────────────────────────────────────────────────
+
 /**
- * Send a chat completion request to Grok via xAI API.
+ * Send a chat completion request to DeepSeek V4 Flash.
+ * Supports both text-only and multimodal (vision) messages.
+ * Returns the raw API response so callers can inspect choices directly.
+ */
+export async function createCompletion(params: {
+  model: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  max_tokens?: number;
+}): Promise<DeepSeekResponse> {
+  const res = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: params.model,
+      messages: params.messages,
+      temperature: params.temperature ?? 0.7,
+      max_tokens: params.max_tokens ?? 2048,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`DeepSeek API error ${res.status}: ${body}`);
+  }
+
+  return res.json() as Promise<DeepSeekResponse>;
+}
+
+// ── High-level helpers ────────────────────────────────────────────────────────
+
+/**
+ * Send a chat completion request to DeepSeek V4 Flash and return the text content.
  */
 export async function chat(
   messages: ChatMessage[],
@@ -88,9 +141,9 @@ export async function chat(
 ): Promise<string> {
   await rateLimiter.acquire();
   const response = await withTimeout(
-    llmClient.chat.completions.create({
+    createCompletion({
       model: MODEL,
-      messages: messages as OpenAI.ChatCompletionMessageParam[],
+      messages,
       temperature: opts.temperature ?? 0.7,
       max_tokens: opts.maxTokens ?? 2048,
     }),
@@ -100,14 +153,14 @@ export async function chat(
 
   const content = response.choices[0]?.message?.content;
   if (!content) {
-    throw new Error('LLM returned empty response');
+    throw new Error('DeepSeek returned empty response');
   }
   return content.trim();
 }
 
 /**
- * Ask Grok to evaluate an image URL for relevance to a topic.
- * Returns YES or NO.
+ * Ask DeepSeek to evaluate an image URL for relevance to a topic.
+ * Returns true (relevant) or false (irrelevant / failed).
  */
 export async function evaluateImageRelevance(
   imageUrl: string,
@@ -116,30 +169,30 @@ export async function evaluateImageRelevance(
 ): Promise<boolean> {
   try {
     await rateLimiter.acquire();
-    const response = await withTimeout(llmClient.chat.completions.create({
-      model: MODEL,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `You are evaluating whether an image is relevant to an article about "${topic}" in the "${pillar}" content pillar.
-
-Respond with ONLY "YES" if the image is clearly relevant and high quality, or "NO" if it is irrelevant, low quality, or inappropriate.
-
-Image URL: ${imageUrl}`,
-            },
-            {
-              type: 'image_url',
-              image_url: { url: imageUrl },
-            },
-          ],
-        },
-      ],
-      max_tokens: 10,
-      temperature: 0,
-    }), CHAT_TIMEOUT_MS, 'vision');
+    const response = await withTimeout(
+      createCompletion({
+        model: MODEL,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `You are evaluating whether an image is relevant to an article about "${topic}" in the "${pillar}" content pillar.\n\nRespond with ONLY "YES" if the image is clearly relevant and high quality, or "NO" if it is irrelevant, low quality, or inappropriate.\n\nImage URL: ${imageUrl}`,
+              },
+              {
+                type: 'image_url',
+                image_url: { url: imageUrl },
+              },
+            ],
+          },
+        ],
+        max_tokens: 10,
+        temperature: 0,
+      }),
+      CHAT_TIMEOUT_MS,
+      'vision'
+    );
 
     const answer = response.choices[0]?.message?.content?.trim().toUpperCase();
     return answer === 'YES';
@@ -151,7 +204,7 @@ Image URL: ${imageUrl}`,
 }
 
 /**
- * Parse a JSON response from the LLM, stripping markdown code blocks if present.
+ * Parse a JSON response from DeepSeek, stripping markdown code blocks if present.
  */
 export function parseJsonResponse<T>(raw: string): T {
   const cleaned = raw

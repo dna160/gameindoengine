@@ -2,7 +2,7 @@
  * Agent 2: Frame Generator (The Art Director)
  *
  * Responsibilities:
- *   1. Vision Analysis — uses Grok Vision to identify the Contextual Focal Point
+ *   1. Vision Analysis — uses DeepSeek Vision to identify the Contextual Focal Point
  *      of the featured article image (x/y as percentages).
  *   2. Programmatic Execution — passes focal point coordinates + pillar to the
  *      image_processor tool, which crops, overlays the branded frame, and
@@ -11,11 +11,12 @@
  * Returns two rendered Buffers: Post (1:1) and Story (9:16).
  */
 
-import { llmClient } from '../../../services/llm';
+import { createCompletion } from '../../../services/llm';
 import { FOCAL_POINT_SYSTEM_PROMPT } from './prompt';
 import { processImage } from './tools/image_processor';
 
-const VISION_MODEL = 'grok-4-fast-non-reasoning';
+// DeepSeek V4 Flash — vision-capable for focal point analysis
+const VISION_MODEL = 'deepseek-v4-flash';
 
 interface FocalPoint {
   focal_x_pct:  number;
@@ -40,7 +41,7 @@ export class FrameGenerator {
 
     this.log(`[FrameGenerator] Analysing focal point for pillar: ${pillar}`);
 
-    // ── Step 1: Grok Vision — identify focal point ────────────────────────────
+    // ── Step 1: DeepSeek Vision — identify focal point ───────────────────────
     const focalPoint = await this.analyseFocalPoint(featuredImageUrl, feedback);
     this.log(
       `[FrameGenerator] Focal point → x:${focalPoint.focal_x_pct.toFixed(2)} ` +
@@ -68,7 +69,7 @@ export class FrameGenerator {
       ? `Analyse this image and return the focal point JSON.\n\nNote from previous review: ${feedback}\nAdjust your focal point recommendation accordingly.`
       : 'Analyse this image and return the focal point JSON.';
 
-    const response = await llmClient.chat.completions.create({
+    const response = await createCompletion({
       model: VISION_MODEL,
       messages: [
         { role: 'system', content: FOCAL_POINT_SYSTEM_PROMPT },

@@ -1,7 +1,7 @@
 /**
  * Frame Generator — Vision Prompt
  *
- * Instructs Grok Vision to identify the Contextual Focal Point of an image
+ * Instructs DeepSeek Vision to identify the Contextual Focal Point of an image
  * so image_processor.ts can calculate smart crop coordinates.
  */
 

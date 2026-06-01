@@ -4,7 +4,7 @@
  * Responsibilities:
  * - Evaluate Scout's topics for pillar relevance (second-pass deep evaluation)
  * - Source images via SERPER
- * - Evaluate image relevance using Grok vision
+ * - Evaluate image relevance using DeepSeek vision
  * - Return 3 highly-relevant images per article
  * - Extract supporting facts for the Copywriter
  */
@@ -110,7 +110,7 @@ Respond in JSON format:
   }
 
   /**
-   * Find 3 highly relevant images for an article using SERPER + Grok vision.
+   * Find 3 highly relevant images for an article using SERPER + DeepSeek vision.
    * Runs multiple search rounds with different queries until quota is met.
    */
   async findImages(
