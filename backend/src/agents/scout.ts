@@ -51,9 +51,9 @@ import type { Pillar, ScoutItem } from '../shared/types';
 import { PILLARS, PILLAR_LABELS } from '../shared/types';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const MAX_CANDIDATES_PER_PILLAR = 20;  // used by FeedMemory.score() to compute need()
-const FRESH_POOL_SIZE           = 200; // items pulled from PRIORITY_FEEDS on round_1
-const RETRY_POOL_SIZE           = 100; // items pulled from fallback feeds per underquota/fallback dispatch
+const MAX_CANDIDATES_PER_PILLAR = 10;  // used by FeedMemory.score() to compute need()
+const FRESH_POOL_SIZE           = 100; // items pulled from PRIORITY_FEEDS on round_1
+const RETRY_POOL_SIZE           = 50;  // items pulled from fallback feeds per underquota/fallback dispatch
 const MIN_BATCH_SIZE            = 4;   // floor for adaptive batching (triageAll)
 const MAX_BATCH_SIZE            = 20;  // ceiling — keeps LLM concurrency bounded
 const ADAPTIVE_OVERSHOOT        = 2;   // batch size = remaining_slots × overshoot

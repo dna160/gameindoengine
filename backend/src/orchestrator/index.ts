@@ -54,44 +54,43 @@ const MAX_REVISION_LOOPS  = 3;
 
 /**
  * How many Scout candidates the Master must collect per pillar before
- * advancing to the Researcher phase (100 total across all 5 pillars).
+ * advancing to the Researcher phase (50 total across all 5 pillars).
  */
-const TARGET_CANDIDATES_PER_PILLAR = 20;
+const TARGET_CANDIDATES_PER_PILLAR = 10;
 
 /**
  * How many successfully published (GREEN/YELLOW) articles the Master
- * targets per pillar per pipeline run (100 total across all 5 pillars).
- * At 12 runs/day (every 2h) this supports 150+ articles/day.
+ * targets per pillar per pipeline run (50 total).
  */
-const ARTICLES_PER_PILLAR = 20;
+const ARTICLES_PER_PILLAR = 10;
 
 /** Safety cap on the number of Scout dispatch rounds in the underquota loop. */
-const MAX_SCOUT_ROUNDS    = 15;
+const MAX_SCOUT_ROUNDS    = 10;
 
 /**
  * How many published articles per pillar per pipeline run get sent through
- * the Social Media Coordinator pipeline.  20 × 5 pillars = 100 social posts max per run.
+ * the Social Media Coordinator pipeline.  10 × 5 pillars = 50 social posts max per run.
  * Matches ARTICLES_PER_PILLAR so every published article gets a social post.
  */
-const MAX_SOCIAL_POSTS_PER_PILLAR = 20;
+const MAX_SOCIAL_POSTS_PER_PILLAR = 10;
 
 /** Consecutive empty Scout rounds before giving up on quota. */
 const MAX_SCOUT_EMPTY_ROUNDS = 3;
 
 /**
  * Jaccard title-similarity threshold above which two articles are treated
- * as covering the same topic.  0.45 means ~45% token overlap required to
- * flag as duplicate — less aggressive than 0.30 so distinct angles on the
- * same news event are not incorrectly blocked.
+ * as covering the same topic.  0.30 means ~30% token overlap.
+ * e.g. "Tami Koi announces new single" vs "Tami Koi reveals debut album"
+ * → shared tokens: {tami, koi} / union of 6 unique tokens = 0.33 → DUPLICATE
  */
-const DEDUP_SIMILARITY_THRESHOLD = 0.45;
+const DEDUP_SIMILARITY_THRESHOLD = 0.30;
 
 /**
  * How far back to look in the Article DB when checking for cross-run
- * topic duplicates. 8 hours allows the same topic to be revisited across
- * day boundaries while still preventing same-run duplicates.
+ * topic duplicates. Articles published within this window block a new
+ * article about the same topic.
  */
-const DEDUP_WINDOW_HOURS = 8;
+const DEDUP_WINDOW_HOURS = 24;
 
 // ── Topic-deduplication utilities ─────────────────────────────────────────────
 
