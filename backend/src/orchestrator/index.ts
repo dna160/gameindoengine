@@ -453,10 +453,17 @@ export class Orchestrator {
 
     /** Slot Scout results into pillar buckets; Master enforces the cap. */
     const processHandover = (newTopics: ScoutItem[]): void => {
+      // Build URL set from all current bucket contents to prevent duplicates.
+      // Underquota re-queries some of the same feeds as Round 1, so the same
+      // item may come back — block it from being added twice.
+      const existingUrls = new Set(PILLARS.flatMap((p) => buckets[p].map((t) => t.link)));
+
       let slotted = 0;
       for (const topic of newTopics) {
+        if (existingUrls.has(topic.link)) continue; // already in a bucket — skip duplicate
         if (buckets[topic.pillar].length < TARGET) {
           buckets[topic.pillar].push(topic);
+          existingUrls.add(topic.link);
           slotted++;
         } else {
           overflow.push(topic); // bucket full → bank for future runs
@@ -517,13 +524,15 @@ export class Orchestrator {
     // ── Underquota Protocol loop ────────────────────────────────────────────
     //
     // Uses Scout.run({ mode: 'underquota_protocol' }) — Tier 1 pillar-specific
-    // RSS_FEEDS (dedicated anime/manga/infotainment feeds) instead of the
-    // general PRIORITY_FEEDS used in Round 1. This prevents the 80% dedup
-    // problem that occurred when the old UnderquotaProtocol class re-queried
-    // the same Tier 2 feeds Round 1 already exhausted.
+    // RSS_FEEDS targeting only the deficit pillars.
     //
-    // The Scout tracks underquotaTriagedUrls internally between consecutive
-    // underquota_protocol calls so URLs are never re-triaged across rounds.
+    // NOTE: postRound1Rejected is NOT passed here. The Tier 1 feeds (RSS_FEEDS)
+    // share many URLs with the Tier 2 PRIORITY_FEEDS that Round 1 used. Passing
+    // postRound1Rejected would block every item in those feeds → empty pool →
+    // 0 results every round. Instead we pass the original rejectedUrls only.
+    // The Scout's underquotaTriagedUrls set prevents re-triaging between
+    // consecutive underquota rounds, and processHandover has URL dedup to
+    // prevent duplicate bucket entries if a Round 1 item reappears.
     //
     let scoutRound  = 2;
     let emptyRounds = 0;
@@ -549,7 +558,7 @@ export class Orchestrator {
 
       const newTopics = await this.scout.run(
         { mode: 'underquota_protocol', missing_pillars: missingLabels },
-        postRound1Rejected
+        rejectedUrls
       );
 
       if (newTopics.length === 0) {
