@@ -74,8 +74,8 @@ const MAX_SCOUT_ROUNDS    = 10;
  */
 const MAX_SOCIAL_POSTS_PER_PILLAR = 10;
 
-/** Consecutive empty Scout rounds before giving up on quota. */
-const MAX_SCOUT_EMPTY_ROUNDS = 3;
+/** Consecutive empty Scout rounds before escalating to Tier 3 fallback. */
+const MAX_SCOUT_EMPTY_ROUNDS = 5;
 
 /**
  * Jaccard title-similarity threshold above which two articles are treated
@@ -563,6 +563,49 @@ export class Orchestrator {
       scoutRound++;
     }
 
+    // ── Tier 3 Fallback escalation ────────────────────────────────────────────
+    // Underquota Protocol only targets PRIORITY_FEEDS tagged for deficit pillars.
+    // If those feeds are dry, escalate to the Scout's fallback_protocol (Tier 3):
+    // every RSS_FEED + PRIORITY_FEED sorted by usefulness score, 14-day window.
+    // This is the missing link that was silently accepting partial quota.
+    if (!isQuotaMet()) {
+      const tier3Missing = getMissing();
+      const tier3Labels  = tier3Missing.map((p) => PILLAR_LABELS[p]);
+      this.addLog(
+        `[Master] Tier 3 Fallback escalation — ${tier3Missing.length} pillar(s) still under quota: ${tier3Labels.join(', ')}`,
+        'warn',
+        ORCHESTRATOR_IDENTITY
+      );
+
+      for (let t3Round = 1; t3Round <= 5 && !isQuotaMet(); t3Round++) {
+        this.checkAbort();
+        const stillMissingLabels = getMissing().map((p) => PILLAR_LABELS[p]);
+        this.addLog(
+          `[Master] Tier 3 round ${t3Round}/5 targeting: ${stillMissingLabels.join(', ')}`,
+          'info',
+          ORCHESTRATOR_IDENTITY
+        );
+        dispatchAgent('scout', stillMissingLabels.join(', '), (msg) =>
+          this.addLog(msg, 'info', ORCHESTRATOR_IDENTITY)
+        );
+        const t3Topics = await this.scout.run(
+          { mode: 'fallback_protocol', missing_pillars: stillMissingLabels },
+          rejectedUrls
+        );
+        if (t3Topics.length === 0) {
+          this.addLog('[Master] Tier 3 returned 0 — all feeds exhausted.', 'warn', ORCHESTRATOR_IDENTITY);
+          break;
+        }
+        processHandover(t3Topics);
+        this.deduplicateBuckets(buckets, recentArticles, TARGET);
+        this.addLog(
+          `[Master] Tier 3 round ${t3Round}: +${t3Topics.length} topics absorbed`,
+          'info',
+          ORCHESTRATOR_IDENTITY
+        );
+      }
+    }
+
     // ── Final quota report ──────────────────────────────────────────────────
     const total = PILLARS.reduce((sum, p) => sum + buckets[p].length, 0);
     if (isQuotaMet()) {
@@ -888,16 +931,59 @@ export class Orchestrator {
 
     // Recall brain backup upfront — only reached after main candidates are exhausted.
     // We recall up to `target` extra items so we have a meaningful reserve.
-    const brainBackup  = bank.recall(pillar, target);
-    const fullQueue    = [...candidates, ...brainBackup];
-    let   brainLogged  = false;
-    let   processedIdx = 0; // how many items we actually started on (for banking untried)
+    const brainBackup = bank.recall(pillar, target);
 
-    for (const topic of fullQueue) {
-      if (successCount >= target) break;
+    // Mutable queue: candidates → brain backup → emergency Tier 3 (appended when dry).
+    // Using an index-based while loop so we can extend the array mid-run.
+    const queue: ScoutItem[] = [...candidates, ...brainBackup];
+    let processedIdx   = 0;
+    let brainLogged    = false;
+    let emergencyDone  = false; // only one emergency fetch per queue
+
+    while (processedIdx < queue.length && successCount < target) {
       this.checkAbort();
 
-      const isBrainItem = processedIdx >= candidates.length;
+      // When we hit the end without reaching target, do one emergency Tier 3 fetch.
+      // Inserting BEFORE consuming the current index so the while condition re-checks.
+      if (processedIdx === queue.length - 1 && successCount < target && !emergencyDone) {
+        emergencyDone = true;
+        const deficit = target - successCount;
+        this.addLog(
+          `[${pillar}/${persona}] Queue dry at ${successCount}/${target} — emergency Tier 3 fetch (need ${deficit} more)`,
+          'warn',
+          ORCHESTRATOR_IDENTITY
+        );
+        try {
+          const emergency   = await this.scout.run(
+            { mode: 'fallback_protocol', missing_pillars: [PILLAR_LABELS[pillar]] },
+            new Set<string>()
+          );
+          const forThisPillar = emergency.filter((t) => t.pillar === pillar);
+          if (forThisPillar.length > 0) {
+            this.addLog(
+              `[${pillar}/${persona}] Emergency Tier 3: +${forThisPillar.length} candidate(s) appended`,
+              'info',
+              ORCHESTRATOR_IDENTITY
+            );
+            queue.push(...forThisPillar);
+          } else {
+            this.addLog(
+              `[${pillar}/${persona}] Emergency Tier 3: no additional ${pillar} candidates found`,
+              'warn',
+              ORCHESTRATOR_IDENTITY
+            );
+          }
+        } catch (err) {
+          this.addLog(
+            `[${pillar}/${persona}] Emergency Tier 3 failed: ${(err as Error).message}`,
+            'warn',
+            ORCHESTRATOR_IDENTITY
+          );
+        }
+      }
+
+      const topic       = queue[processedIdx];
+      const isBrainItem = processedIdx >= candidates.length && processedIdx < candidates.length + brainBackup.length;
 
       // Announce the first time we cross into brain territory
       if (isBrainItem && !brainLogged) {
@@ -1025,8 +1111,8 @@ export class Orchestrator {
       }
     }
 
-    // Bank any items we never reached (quota hit early or pool exhausted with leftover brain items)
-    const untriedItems = fullQueue.slice(processedIdx);
+    // Bank any items we never reached (quota hit early or pool exhausted with leftover items)
+    const untriedItems = queue.slice(processedIdx);
     if (untriedItems.length > 0) {
       const added = bank.add(untriedItems);
       if (added > 0) {
