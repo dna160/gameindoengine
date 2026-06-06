@@ -21,12 +21,12 @@
  *   Modes:
  *     round_1            — Tier 2 broad scrape from PRIORITY_FEEDS (general,
  *                          mixed-topic). Resets per-run state (triagedUrls,
- *                          FeedMemory). Pool cap: FRESH_POOL_SIZE (100).
+ *                          FeedMemory). Pool cap: FRESH_POOL_SIZE (200).
  *     underquota_protocol — Tier 1 "sniper" fetch: Scout reads missing_pillars
  *                           from the Master and targets only the hyper-specific
  *                           RSS_FEEDS subpillar branches for those pillars.
  *                           Results are strictly filtered to the missing pillars.
- *                           Pool cap: RETRY_POOL_SIZE (50).
+ *                           Pool cap: RETRY_POOL_SIZE (100).
  *     fallback_protocol   — Tier 3 wide sweep: all RSS_FEEDS sorted by empirical
  *                           FeedMemory score, 14-day age window. Last resort when
  *                           both Round 1 and Underquota have failed to fill quota.
@@ -51,9 +51,11 @@ import type { Pillar, ScoutItem } from '../shared/types';
 import { PILLARS, PILLAR_LABELS } from '../shared/types';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const MAX_CANDIDATES_PER_PILLAR = 10;  // used by FeedMemory.score() to compute need()
-const FRESH_POOL_SIZE           = 100; // items pulled from PRIORITY_FEEDS on round_1
-const RETRY_POOL_SIZE           = 50;  // items pulled from fallback feeds per underquota/fallback dispatch
+const MAX_CANDIDATES_PER_PILLAR = 10;  // output cap per pillar — do not raise without raising orchestrator target
+const FRESH_POOL_SIZE           = 200; // items fetched from PRIORITY_FEEDS on round_1
+                                       // (doubled so gaming/toys fill early and leave 160+ items for deficit pillars)
+const RETRY_POOL_SIZE           = 100; // items fetched per underquota/fallback dispatch
+                                       // (doubled to survive DB dedup across consecutive underquota rounds)
 const MIN_BATCH_SIZE            = 4;   // floor for adaptive batching (triageAll)
 const MAX_BATCH_SIZE            = 20;  // ceiling — keeps LLM concurrency bounded
 const ADAPTIVE_OVERSHOOT        = 2;   // batch size = remaining_slots × overshoot
