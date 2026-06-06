@@ -107,7 +107,9 @@ const AGE_RETRY_DAYS            = 14;
  */
 const USEFUL_SCORE_THRESHOLD    = 0.15;
 
-const MEMORY_FILE = path.join(process.cwd(), 'data', 'feed-memory.json');
+const MEMORY_FILE        = path.join(process.cwd(), 'data', 'feed-memory.json');
+const TRIAGE_MEMORY_FILE = path.join(process.cwd(), 'data', 'triage-memory.json');
+const TRIAGE_TTL_MS      = 7 * 24 * 60 * 60 * 1000; // 7 days — items seen longer ago than this are re-eligible
 
 // ── ScoutPayload — sent by the Master Orchestrator on each dispatch ───────────
 export interface ScoutPayload {
@@ -443,6 +445,68 @@ export class Scout {
    */
   public getRound1TriagedUrls(): ReadonlySet<string> {
     return this.round1TriagedUrls;
+  }
+
+  // ── Cross-run triage memory ──────────────────────────────────────────────────
+
+  /**
+   * Load previously-triaged URLs from disk.
+   *
+   * Each entry is stamped with the Unix timestamp it was triaged.
+   * Items older than TRIAGE_TTL_MS (7 days) are silently discarded on load —
+   * after 7 days the same article can be re-evaluated if it resurfaces in a feed.
+   */
+  private async loadTriageMemory(): Promise<Set<string>> {
+    try {
+      const raw    = await fs.readFile(TRIAGE_MEMORY_FILE, 'utf-8');
+      const data   = JSON.parse(raw) as Record<string, number>;
+      const cutoff = Date.now() - TRIAGE_TTL_MS;
+      const alive  = new Set<string>();
+      for (const [url, ts] of Object.entries(data)) {
+        if (ts > cutoff) alive.add(url);
+      }
+      if (alive.size > 0) {
+        this.log(`[Scout] Triage memory: ${alive.size} previously-seen URL(s) loaded (7-day window) — these will be skipped`);
+      }
+      return alive;
+    } catch {
+      return new Set(); // first run or corrupt file — start fresh
+    }
+  }
+
+  /**
+   * Persist newly-triaged URLs to disk, merging with existing entries.
+   *
+   * Reads the current file, expires entries older than TRIAGE_TTL_MS, stamps
+   * all new URLs with the current time, and writes the merged result back.
+   * Failures are non-fatal — the pipeline continues without persistence.
+   */
+  private async saveTriageMemory(newUrls: ReadonlySet<string>): Promise<void> {
+    try {
+      let existing: Record<string, number> = {};
+      try {
+        existing = JSON.parse(await fs.readFile(TRIAGE_MEMORY_FILE, 'utf-8'));
+      } catch { /* file doesn't exist yet — start fresh */ }
+
+      const cutoff = Date.now() - TRIAGE_TTL_MS;
+      const now    = Date.now();
+      const fresh: Record<string, number> = {};
+
+      // Keep non-expired existing entries
+      for (const [url, ts] of Object.entries(existing)) {
+        if (ts > cutoff) fresh[url] = ts;
+      }
+      // Stamp new URLs with current time
+      for (const url of newUrls) {
+        fresh[url] = now;
+      }
+
+      await fs.mkdir(path.dirname(TRIAGE_MEMORY_FILE), { recursive: true });
+      await fs.writeFile(TRIAGE_MEMORY_FILE, JSON.stringify(fresh), 'utf-8');
+      this.log(`[Scout] Triage memory saved: ${Object.keys(fresh).length} URL(s) total`);
+    } catch (err) {
+      this.log(`[Scout] Triage memory save failed (non-fatal): ${(err as Error).message}`);
+    }
   }
 
   // ── DB helpers ───────────────────────────────────────────────────────────────
@@ -1036,6 +1100,19 @@ Respond ONLY with the JSON object.`;
       await this.memory.load(this.log);
       const memSummary = this.memory.summary();
       if (memSummary) this.log(`[Scout] Historical feed memory: ${memSummary}`);
+
+      // Seed BOTH triage sets with URLs evaluated in previous pipeline runs.
+      // This prevents the Scout from re-triaging the same items it already
+      // saw and rejected/capped in earlier runs — the core fix for the
+      // "80% dedup on the same RSS top items" problem. Items expire after
+      // 7 days so feeds are naturally re-scanned as content ages out.
+      const previouslySeen = await this.loadTriageMemory();
+      if (previouslySeen.size > 0) {
+        for (const url of previouslySeen) {
+          this.round1TriagedUrls.add(url);
+          this.underquotaTriagedUrls.add(url);
+        }
+      }
     }
 
     this.log(
@@ -1140,6 +1217,13 @@ Respond ONLY with the JSON object.`;
     );
 
     await this.memory.save(this.log);
+
+    // Persist all triaged URLs (both sets) so the next pipeline run skips them.
+    // This is the cross-run bookmark — each run advances deeper into the feed
+    // instead of repeatedly re-triaging the same top items.
+    await this.saveTriageMemory(
+      new Set([...this.round1TriagedUrls, ...this.underquotaTriagedUrls])
+    );
 
     this.log(
       `[Scout] Handover complete — ${results.length} topic(s) returned to Master.` +
