@@ -31,12 +31,12 @@ import { PILLARS }                  from '../shared/types';
 import type { Pillar, ScoutItem }   from '../shared/types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const UNDERQUOTA_POOL_SIZE       = 50;
+const UNDERQUOTA_POOL_SIZE       = 100;
 const MIN_BATCH_SIZE             = 4;   // floor for adaptive batching
 const MAX_BATCH_SIZE             = 20;  // ceiling — keeps LLM concurrency bounded
 const ADAPTIVE_OVERSHOOT         = 2;   // batch = remaining_slots × overshoot
 const AGE_LIMIT_DAYS             = 14;  // under-served pillars often have older items still relevant
-const MAX_CANDIDATES_PER_PILLAR  = 10;
+const MAX_CANDIDATES_PER_PILLAR  = 20;
 const PREDICTIVE_SKIP_THRESHOLD  = 0.7; // skip LLM if source ≥70% affinity for full pillar
 const MEMORY_FILE                = path.join(process.cwd(), 'data', 'feed-memory.json');
 
