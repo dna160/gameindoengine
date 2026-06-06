@@ -506,13 +506,24 @@ export class Orchestrator {
     processHandover(round1Topics);
     this.deduplicateBuckets(buckets, recentArticles, TARGET);
 
+    // After Round 1, build a combined rejected set for all subsequent dispatches.
+    // This merges the caller's rejected URLs with every URL the Scout triaged in
+    // Round 1. Even if Tier 1 / Tier 2 feeds share some items, those items will
+    // be blocked in underquota and fallback pools so the LLM is never called on
+    // the same item twice within a single pipeline run.
+    const round1Triaged       = this.scout.getRound1TriagedUrls();
+    const postRound1Rejected  = new Set([...rejectedUrls, ...round1Triaged]);
+
     // ── Underquota Protocol loop ────────────────────────────────────────────
     //
-    // Activated when Round 1 leaves any pillar below quota.
-    // The UnderquotaProtocol targets PRIORITY_FEEDS entries whose tags match
-    // the deficit pillar(s), building a focused pool of up to 50 items per
-    // dispatch.  No fallback escalation occurs here — if the tagged priority
-    // feeds are exhausted, the Master proceeds with whatever quota was reached.
+    // Uses Scout.run({ mode: 'underquota_protocol' }) — Tier 1 pillar-specific
+    // RSS_FEEDS (dedicated anime/manga/infotainment feeds) instead of the
+    // general PRIORITY_FEEDS used in Round 1. This prevents the 80% dedup
+    // problem that occurred when the old UnderquotaProtocol class re-queried
+    // the same Tier 2 feeds Round 1 already exhausted.
+    //
+    // The Scout tracks underquotaTriagedUrls internally between consecutive
+    // underquota_protocol calls so URLs are never re-triaged across rounds.
     //
     let scoutRound  = 2;
     let emptyRounds = 0;
@@ -527,7 +538,7 @@ export class Orchestrator {
         .join(', ');
 
       this.addLog(
-        `[Master] Quota deficit: ${deficit} — dispatching Underquota Protocol round ${scoutRound}`,
+        `[Master] Quota deficit: ${deficit} — dispatching Scout Tier 1 underquota round ${scoutRound}`,
         'warn',
         ORCHESTRATOR_IDENTITY
       );
@@ -536,7 +547,10 @@ export class Orchestrator {
         this.addLog(msg, 'info', ORCHESTRATOR_IDENTITY)
       );
 
-      const newTopics = await this.underquotaProtocol.run(missingLabels, rejectedUrls);
+      const newTopics = await this.scout.run(
+        { mode: 'underquota_protocol', missing_pillars: missingLabels },
+        postRound1Rejected
+      );
 
       if (newTopics.length === 0) {
         emptyRounds++;
@@ -564,10 +578,11 @@ export class Orchestrator {
     }
 
     // ── Tier 3 Fallback escalation ────────────────────────────────────────────
-    // Underquota Protocol only targets PRIORITY_FEEDS tagged for deficit pillars.
-    // If those feeds are dry, escalate to the Scout's fallback_protocol (Tier 3):
-    // every RSS_FEED + PRIORITY_FEED sorted by usefulness score, 14-day window.
-    // This is the missing link that was silently accepting partial quota.
+    // If Tier 1 pillar-specific feeds (underquota_protocol) are still insufficient,
+    // escalate to Tier 3: ALL RSS_FEEDS + PRIORITY_FEEDS sorted by usefulness
+    // score with a 14-day age window — the broadest possible net.
+    // postRound1Rejected is passed so Tier 3 doesn't re-triage anything from
+    // Round 1 either.
     if (!isQuotaMet()) {
       const tier3Missing = getMissing();
       const tier3Labels  = tier3Missing.map((p) => PILLAR_LABELS[p]);
@@ -590,7 +605,7 @@ export class Orchestrator {
         );
         const t3Topics = await this.scout.run(
           { mode: 'fallback_protocol', missing_pillars: stillMissingLabels },
-          rejectedUrls
+          postRound1Rejected
         );
         if (t3Topics.length === 0) {
           this.addLog('[Master] Tier 3 returned 0 — all feeds exhausted.', 'warn', ORCHESTRATOR_IDENTITY);

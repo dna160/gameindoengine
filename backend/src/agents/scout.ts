@@ -434,6 +434,15 @@ export class Scout {
     this.log    = log;
   }
 
+  /**
+   * Returns the set of URLs triaged during the most recent round_1 dispatch.
+   * Used by the orchestrator to block these from underquota/fallback dispatches
+   * in case Tier 1 and Tier 2 feeds share any items.
+   */
+  public getRound1TriagedUrls(): ReadonlySet<string> {
+    return this.round1TriagedUrls;
+  }
+
   // ── DB helpers ───────────────────────────────────────────────────────────────
 
   private async isProcessed(url: string): Promise<boolean> {
