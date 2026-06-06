@@ -107,7 +107,9 @@ const AGE_RETRY_DAYS            = 14;
  */
 const USEFUL_SCORE_THRESHOLD    = 0.15;
 
-const MEMORY_FILE = path.join(process.cwd(), 'data', 'feed-memory.json');
+const MEMORY_FILE           = path.join(process.cwd(), 'data', 'feed-memory.json');
+const UNDERQUOTA_MEMORY_FILE = path.join(process.cwd(), 'data', 'underquota-memory.json');
+const UNDERQUOTA_TTL_MS      = 7 * 24 * 60 * 60 * 1000; // 7-day expiry
 
 // ── ScoutPayload — sent by the Master Orchestrator on each dispatch ───────────
 export interface ScoutPayload {
@@ -443,6 +445,63 @@ export class Scout {
    */
   public getRound1TriagedUrls(): ReadonlySet<string> {
     return this.round1TriagedUrls;
+  }
+
+  // ── Underquota persistent bookmark ──────────────────────────────────────────
+  //
+  // Round 1 is always fresh (no cross-run memory).
+  // Underquota and fallback dispatches ARE persistent — each pipeline run's
+  // underquota continues from where the previous run's underquota left off,
+  // advancing deeper through feeds rather than re-sweeping the same top items.
+  // Entries expire after 7 days so feeds naturally become eligible again.
+
+  private async loadUnderquotaMemory(): Promise<void> {
+    try {
+      const raw    = await fs.readFile(UNDERQUOTA_MEMORY_FILE, 'utf-8');
+      const data   = JSON.parse(raw) as Record<string, number>;
+      const cutoff = Date.now() - UNDERQUOTA_TTL_MS;
+      let   loaded = 0;
+      for (const [url, ts] of Object.entries(data)) {
+        if (ts > cutoff) {
+          this.underquotaTriagedUrls.add(url);
+          loaded++;
+        }
+      }
+      if (loaded > 0) {
+        this.log(
+          `[Scout] Underquota bookmark: ${loaded} previously-seen URL(s) loaded — ` +
+          `underquota will advance past these items`
+        );
+      }
+    } catch {
+      // No file yet or corrupt — start fresh, underquota begins from top
+    }
+  }
+
+  private async saveUnderquotaMemory(): Promise<void> {
+    try {
+      let existing: Record<string, number> = {};
+      try {
+        existing = JSON.parse(await fs.readFile(UNDERQUOTA_MEMORY_FILE, 'utf-8'));
+      } catch { /* first save */ }
+
+      const cutoff = Date.now() - UNDERQUOTA_TTL_MS;
+      const now    = Date.now();
+      const fresh: Record<string, number> = {};
+
+      for (const [url, ts] of Object.entries(existing)) {
+        if (ts > cutoff) fresh[url] = ts;
+      }
+      for (const url of this.underquotaTriagedUrls) {
+        fresh[url] = now;
+      }
+
+      await fs.mkdir(path.dirname(UNDERQUOTA_MEMORY_FILE), { recursive: true });
+      await fs.writeFile(UNDERQUOTA_MEMORY_FILE, JSON.stringify(fresh), 'utf-8');
+      this.log(`[Scout] Underquota bookmark saved: ${Object.keys(fresh).length} URL(s)`);
+    } catch (err) {
+      this.log(`[Scout] Underquota bookmark save failed (non-fatal): ${(err as Error).message}`);
+    }
   }
 
   // ── DB helpers ───────────────────────────────────────────────────────────────
@@ -1030,12 +1089,22 @@ Respond ONLY with the JSON object.`;
 
     // ── Per-run state reset (round_1 only) ────────────────────────────────────
     if (mode === 'round_1') {
+      // Round 1 always starts fresh — no cross-run memory for the broad scrape.
       this.round1TriagedUrls     = new Set();
       this.underquotaTriagedUrls = new Set();
       this.memory                = new FeedMemory();
       await this.memory.load(this.log);
       const memSummary = this.memory.summary();
       if (memSummary) this.log(`[Scout] Historical feed memory: ${memSummary}`);
+    }
+
+    // ── Underquota bookmark: load on first underquota dispatch of this run ─────
+    // underquotaTriagedUrls.size === 0 means this is the first underquota/fallback
+    // call since the round_1 reset. Seed it with URLs from the last pipeline run
+    // so underquota continues from where it left off rather than re-sweeping the
+    // same top-of-feed items.
+    if (mode !== 'round_1' && this.underquotaTriagedUrls.size === 0) {
+      await this.loadUnderquotaMemory();
     }
 
     this.log(
@@ -1140,6 +1209,13 @@ Respond ONLY with the JSON object.`;
     );
 
     await this.memory.save(this.log);
+
+    // Save underquota bookmark after every underquota/fallback dispatch so the
+    // next pipeline run's underquota advances past these items.
+    // Round 1 is excluded — it is always fresh.
+    if (mode !== 'round_1') {
+      await this.saveUnderquotaMemory();
+    }
 
     this.log(
       `[Scout] Handover complete — ${results.length} topic(s) returned to Master.` +
