@@ -129,6 +129,23 @@ export const PRIORITY_FEEDS: FeedConfig[] = [
   },
 
   // ─────────────────────────────────────────────────────────────────────────
+  //   ANIMECORNER — https://animecorner.me
+  //
+  //   Confirmed exclusive anime source.  feed-memory.json records 86 anime
+  //   items, 10 gaming, 9 manga (105 total across prior runs).  Uses its own
+  //   WordPress-hosted RSS feed — content is entirely distinct from ANN and
+  //   Mastodon proxies, so it provides a genuinely fresh pool of articles
+  //   even when ANN is exhausted by a prior run within the same 8-hour window.
+  //   Classified as 'medium' confidence (proven output, not yet at 'high'
+  //   threshold of ≥30 consistent items per pillar per run).
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    url:        'https://animecorner.me/feed/',
+    tags:       ['anime', 'manga'],
+    confidence: 'medium',
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
   //   MASTODON PROXIES — Japanese publication aggregators served via
   //   rss-mstdn.studiofreesia.com.  These URLs were ALREADY in the codebase
   //   as fallbacks for the now-dead natalie.mu/* and oricon.co.jp/* primary
@@ -214,8 +231,9 @@ export const PRIORITY_FEEDS: FeedConfig[] = [
  */
 export const RSS_FEEDS: Record<Pillar, string[]> = {
   anime: [
+    'https://www.animenewsnetwork.com/all/rss.xml?ann-edition=us',       // ANN — anime 69% (primary)
+    'https://animecorner.me/feed/',                                       // AnimeCorner — 86 anime items in history; EXCLUSIVE (not in PRIORITY_FEEDS before v2)
     'https://chaosphere.hostdon.jp/@natalie.rss',                        // Natalie via Mastodon proxy — manga 65%, anime 30%
-    'https://www.animenewsnetwork.com/all/rss.xml?ann-edition=us',       // ANN — anime 69%
     'https://rss-mstdn.studiofreesia.com/@animeanime.rss',               // animeanime.jp via Mastodon proxy
   ],
   gaming: [
@@ -232,6 +250,7 @@ export const RSS_FEEDS: Record<Pillar, string[]> = {
   manga: [
     'https://chaosphere.hostdon.jp/@natalie.rss',                        // Natalie — manga 65% (best manga source)
     'https://www.animenewsnetwork.com/all/rss.xml?ann-edition=us',       // ANN — manga 16%
+    'https://animecorner.me/feed/',                                       // AnimeCorner — 9 manga items in history; EXCLUSIVE source
     'https://hobby.dengeki.com/feed/',                                    // Dengeki Hobby — manga 9%
     'https://news.denfaminicogamer.jp/feed',                              // Denfami — manga 7%
   ],

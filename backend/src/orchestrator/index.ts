@@ -79,11 +79,18 @@ const MAX_SCOUT_EMPTY_ROUNDS = 5;
 
 /**
  * Jaccard title-similarity threshold above which two articles are treated
- * as covering the same topic.  0.30 means ~30% token overlap.
- * e.g. "Tami Koi announces new single" vs "Tami Koi reveals debut album"
- * → shared tokens: {tami, koi} / union of 6 unique tokens = 0.33 → DUPLICATE
+ * as covering the same topic.  0.40 means ~40% meaningful token overlap.
+ *
+ * Raised from 0.30 because Mastodon-proxy article titles include raw URLs
+ * (e.g. "…ジェシー… https://natalie.mu/music/news/675124") whose domain/path
+ * fragments ("natalie", "news", "music", "https") appear in every article
+ * from that source and inflate Jaccard well above 0.30 for completely
+ * unrelated articles.  The titleTokens() function now strips URLs and URL
+ * structural tokens before computing similarity, so 0.40 is a safe threshold
+ * that catches genuine same-story duplicates while allowing distinct articles
+ * from the same news domain.
  */
-const DEDUP_SIMILARITY_THRESHOLD = 0.30;
+const DEDUP_SIMILARITY_THRESHOLD = 0.40;
 
 /**
  * How far back to look in the Article DB when checking for cross-run
@@ -99,12 +106,46 @@ const DEDUP_STOP_WORDS = new Set([
   'the','a','an','is','are','was','were','of','in','on','at','to','for','by','with','and','or','new',
   // Indonesian
   'dan','yang','di','ke','dari','dengan','untuk','ini','itu','akan','telah','sudah','juga','baru','terbaru',
+  // ── URL structural tokens ──────────────────────────────────────────────────
+  // Mastodon-proxy article titles include raw URLs inline.  JavaScript \w does
+  // NOT match Japanese characters, so after replace(/[^\w\s]/g,' ') the only
+  // surviving tokens are ASCII — meaning all articles from the same domain
+  // (natalie.mu, gamespark.jp, etc.) share domain/path tokens like "natalie",
+  // "news", "article", "https" and appear 30-60% similar despite being totally
+  // unrelated stories.  We strip full URLs in titleTokens() AND blocklist the
+  // most common structural fragments here as a belt-and-suspenders defence.
+  'http','https','www',
+  // TLD fragments that survive after non-word replacement
+  'com','net','org','jp','me','io',
+  // Common Japanese news domain names (appear in bare URLs without https://)
+  'natalie','oricon','gamespark','animenews','animeanime','animecorner',
+  // Common URL path segments
+  'article','news','rss','feed','full',
+  // Year tokens — identical across all articles in a batch, not content-specific
+  '2024','2025','2026','2027',
 ]);
 
-/** Tokenise a title into a set of meaningful lowercase words. */
+/**
+ * Tokenise a title into a set of meaningful lowercase words.
+ *
+ * Pre-processing order matters:
+ *   1. Strip full URLs (https://…) — Mastodon proxy titles embed the article
+ *      URL inline; removing it prevents URL domain tokens ("natalie", "news",
+ *      "https") from inflating Jaccard similarity between unrelated articles.
+ *   2. Strip bare domain-like patterns (e.g. "gamespark.jp/article/…") that
+ *      appear in titles without an https:// prefix.
+ *   3. Replace all non-word, non-space characters with spaces so Japanese
+ *      characters collapse cleanly (JS \w = ASCII only, Japanese → spaces).
+ *   4. Split on whitespace, filter short tokens and stop words.
+ */
 function titleTokens(title: string): Set<string> {
   return new Set(
     title.toLowerCase()
+      // 1. Strip full URLs
+      .replace(/https?:\/\/\S+/g, ' ')
+      // 2. Strip bare domain paths (e.g. "gamespark.jp/article/2026/06/07/…")
+      .replace(/\b[\w-]+\.(jp|com|net|org|me|io|html?|php)\S*/gi, ' ')
+      // 3. Collapse non-word chars (includes all Japanese, punctuation, brackets)
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
       .filter((t) => t.length > 2 && !DEDUP_STOP_WORDS.has(t))
