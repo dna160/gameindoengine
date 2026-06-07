@@ -110,25 +110,115 @@ Respond in JSON format:
   }
 
   /**
-   * Find 3 highly relevant images for an article using SERPER + DeepSeek vision.
-   * Runs multiple search rounds with different queries until quota is met.
+   * Generate 5 contextual, article-specific image search queries using DeepSeek.
+   *
+   * Uses the article title, extracted facts, and Scout translation notes (which
+   * contain proper English/Romaji names for Japanese entities) to produce queries
+   * ordered from most specific (exact character/game/product name) to broader
+   * (thematic context).  This replaces the old static fallbacks like
+   * "Japanese Toys/Collectibles illustration" that had zero relevance to the
+   * actual article topic.
+   *
+   * Falls back to title-derived ASCII queries if the LLM call fails.
+   */
+  private async generateImageQueries(
+    title:            string,
+    pillar:           Pillar,
+    facts:            string[],
+    translationNotes: string = ''
+  ): Promise<string[]> {
+    const factsBlock = facts.length > 0
+      ? `\nKey facts:\n${facts.slice(0, 5).map((f) => `- ${f}`).join('\n')}`
+      : '';
+    const notesBlock = translationNotes.trim().length > 0
+      ? `\nEnglish / Romaji names for entities in this article:\n${translationNotes.slice(0, 400)}`
+      : '';
+
+    const prompt = `You are an image researcher for a Japanese pop-culture newsroom.
+Generate 5 Google Images search queries for this article.
+
+Rules:
+- ALL queries must be written in English (no Japanese characters)
+- Every query must be SPECIFIC to this article's actual subject — character names, game titles, product names, artist names, etc.
+- NEVER produce generic queries like "Japanese Toys illustration" or "anime art" — those return unrelated stock photos
+- Order queries from most specific (exact named subject) → progressively broader (related context)
+- Use English/Romaji names from translation notes where available — search engines handle these better than kanji
+- Each query should find images a reader would recognise as illustrating this exact article
+
+Article title: "${title}"
+Content pillar: "${PILLAR_LABELS[pillar]}"${factsBlock}${notesBlock}
+
+Respond ONLY with a valid JSON array of exactly 5 query strings (no markdown, no explanation):
+["most specific query", "query 2", "query 3", "query 4", "broadest relevant query"]`;
+
+    try {
+      const raw = await chat(
+        [{ role: 'user', content: prompt }],
+        { temperature: 0.3, maxTokens: 300 }
+      );
+      const cleaned = raw.trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/```\s*$/, '')
+        .trim();
+      const parsed = JSON.parse(cleaned) as unknown;
+      if (Array.isArray(parsed) && parsed.length >= 3) {
+        const queries = (parsed as unknown[])
+          .map((q) => String(q).trim())
+          .filter((q) => q.length > 3);
+        if (queries.length >= 3) {
+          return queries.slice(0, MAX_IMAGE_SEARCH_ROUNDS);
+        }
+      }
+    } catch (err) {
+      this.log(
+        `[Researcher] Image query generation failed: ${(err as Error).message} — using title-based fallbacks`
+      );
+    }
+
+    // Fallback: derive queries from the article title by stripping non-ASCII so
+    // the queries are usable in Google Images even for Japanese-language titles.
+    const asciiTitle = title.replace(/[^\x00-\x7F]/g, ' ').replace(/\s+/g, ' ').trim();
+    const shortTitle = asciiTitle.split(' ').slice(0, 5).join(' ').trim() || title.slice(0, 50);
+    const tinyTitle  = asciiTitle.split(' ').slice(0, 3).join(' ').trim() || title.slice(0, 25);
+    return [
+      buildImageQuery(title, pillar),
+      shortTitle,
+      `${PILLAR_LABELS[pillar]} ${tinyTitle}`,
+      `${shortTitle} Japan official`,
+      `${PILLAR_LABELS[pillar]} Japan ${tinyTitle}`,
+    ].filter((q) => q.trim().length > 3);
+  }
+
+  /**
+   * Find 3 highly relevant images for an article using SERPER + URL validation.
+   *
+   * Generates article-specific search queries via LLM (using facts and translation
+   * notes for context) rather than using generic pillar-label fallbacks.  Each
+   * round uses a progressively broader but always on-topic query.
+   *
+   * @param title            Article title (used for alt text and query generation)
+   * @param pillar           Content pillar
+   * @param existingUrls     URLs already approved in previous calls (skip these)
+   * @param facts            Extracted article facts — fed to the query generator
+   * @param translationNotes Scout's English/Romaji names for Japanese entities
    */
   async findImages(
-    title: string,
-    pillar: Pillar,
-    existingUrls: Set<string> = new Set()
+    title:            string,
+    pillar:           Pillar,
+    existingUrls:     Set<string> = new Set(),
+    facts:            string[]    = [],
+    translationNotes: string      = ''
   ): Promise<ArticleImage[]> {
     const approved: ArticleImage[] = [];
     const triedUrls = new Set<string>(existingUrls);
 
-    const baseQuery = buildImageQuery(title, pillar);
-    const queryVariants = [
-      baseQuery,
-      `${PILLAR_LABELS[pillar]} ${title.split(' ').slice(0, 4).join(' ')}`,
-      `${baseQuery} official art`,
-      `${PILLAR_LABELS[pillar]} illustration`,
-      `Japan ${pillar} popular`,
-    ];
+    // One LLM call generates all 5 contextual queries upfront.
+    // Queries are specific to the article topic — never generic pillar labels.
+    this.log(`[Researcher] Generating contextual image queries for "${title}"...`);
+    const queryVariants = await this.generateImageQueries(title, pillar, facts, translationNotes);
+    this.log(
+      `[Researcher] Image queries: ${queryVariants.map((q, i) => `[${i + 1}] "${q}"`).join(' | ')}`
+    );
 
     for (let round = 0; round < MAX_IMAGE_SEARCH_ROUNDS && approved.length < REQUIRED_IMAGES; round++) {
       const query = queryVariants[round % queryVariants.length];
@@ -207,8 +297,16 @@ Respond in JSON format:
     // Extract facts (uses crawled content when available, RSS summary otherwise)
     const facts = await this.extractFacts(item, crawledContent);
 
-    // Find images
-    const images = await this.findImages(item.title, item.pillar);
+    // Find images — pass extracted facts and Scout translation notes so the
+    // image query generator can produce article-specific queries (e.g. "Kamen
+    // Rider Rider Pass accessory Japan" instead of "Japanese Toys illustration").
+    const images = await this.findImages(
+      item.title,
+      item.pillar,
+      new Set(),
+      facts,
+      item.translationNotes ?? ''
+    );
 
     return {
       ...item,
