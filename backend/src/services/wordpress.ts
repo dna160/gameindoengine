@@ -107,15 +107,20 @@ export async function uploadImageFromUrl(
                contentType.includes('webp') ? 'webp' : 'jpg';
   const filename = `article-image-${Date.now()}.${ext}`;
 
-  // ── Step 2: upload binary to WP media library ────────────────────────────
+  // ── Step 2: upload to WP media library via multipart/form-data ──────────
+  // Raw Buffer POSTs arrive as an empty php://input on some PHP/server configs
+  // (Node.js v24 undici sends chunked encoding which PHP may not read).
+  // FormData lets PHP populate $_FILES['file'] reliably.
+  const form = new FormData();
+  form.append('file', new Blob([imageBuffer], { type: contentType }), filename);
+
   const uploadResponse = await fetch(`${apiBase}/media`, {
     method: 'POST',
     headers: {
       Authorization: auth,
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Type': contentType,
+      // No Content-Type — fetch sets multipart/form-data + boundary automatically
     },
-    body: imageBuffer,
+    body: form,
   });
 
   if (!uploadResponse.ok) {
