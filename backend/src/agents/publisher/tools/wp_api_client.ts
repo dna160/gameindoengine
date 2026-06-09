@@ -44,10 +44,11 @@ export interface WpPostPayload {
 }
 
 export interface WpPostResponse {
-  id:     number;
-  link:   string;
-  status: string;
-  title:  { rendered: string };
+  id:             number;
+  link:           string;
+  status:         string;
+  title:          { rendered: string };
+  featured_media: number;   // 0 = not set, >0 = WP media ID
 }
 
 export interface WpMediaResponse {
@@ -246,14 +247,42 @@ export async function publishToWordPress(params: {
   const categoryId = CATEGORY_IDS[pillar];
   const authorId   = authorName ? AUTHOR_IDS[authorName] : undefined;
 
+  // featured_media is placed BEFORE content intentionally.
+  // content can be 20–50 KB of HTML; WAFs that parse request bodies up to a
+  // size limit will drop everything after the large content field.
+  // Putting featured_media first ensures it is always received.
   const post = await createPost({
     title,
-    content:         finalHtml,
-    status:          'publish',
     featured_media:  featuredMediaId,
     categories:      [categoryId],
     ...(authorId !== undefined ? { author: authorId } : {}),
+    status:          'publish',
+    content:         finalHtml,
   });
+
+  console.log(`[WpApiClient] Post ${post.id} created — WP returned featured_media=${post.featured_media}`);
+
+  // Belt-and-suspenders: if WordPress still shows featured_media=0 after
+  // creation (WAF stripped the field), PATCH it explicitly with a tiny payload.
+  if (featuredMediaId !== undefined && post.featured_media !== featuredMediaId) {
+    console.warn(`[WpApiClient] featured_media mismatch (sent ${featuredMediaId}, got ${post.featured_media}) — sending PATCH`);
+    const { apiBase, auth } = getConfig();
+    try {
+      const patchRes = await fetch(`${apiBase}/posts/${post.id}`, {
+        method:  'POST',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ featured_media: featuredMediaId }),
+      });
+      if (patchRes.ok) {
+        const patched = await patchRes.json() as WpPostResponse;
+        console.log(`[WpApiClient] PATCH result — featured_media=${patched.featured_media}`);
+      } else {
+        console.warn(`[WpApiClient] PATCH failed: ${patchRes.status}`);
+      }
+    } catch (err) {
+      console.warn(`[WpApiClient] PATCH threw:`, (err as Error).message);
+    }
+  }
 
   return { wpPostId: post.id, wpPostUrl: post.link };
 }
