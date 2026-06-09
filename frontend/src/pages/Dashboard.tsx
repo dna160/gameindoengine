@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { NewsroomFloor } from '../components/NewsroomFloor';
 import { ReviewRoom } from '../components/ReviewRoom';
 import type { Article, PipelineStatusData, DashboardStats } from '../types';
 import {
   getArticles,
   getPipelineStatus,
-  getDashboardStats,
   triggerPipeline,
   abortPipeline,
 } from '../api';
@@ -24,7 +23,6 @@ function useInterval(callback: () => void, delay: number) {
 export const Dashboard: React.FC = () => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [pipelineStatus, setPipelineStatus] = useState<PipelineStatusData | null>(null);
-  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [error, setError] = useState<string | null>(null);
@@ -33,14 +31,12 @@ export const Dashboard: React.FC = () => {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [articlesData, statusData, statsData] = await Promise.all([
+      const [articlesData, statusData] = await Promise.all([
         getArticles(),
         getPipelineStatus(),
-        getDashboardStats(),
       ]);
       setArticles(articlesData);
       setPipelineStatus(statusData);
-      setStats(statsData);
       setError(null);
       setLastRefresh(new Date());
     } catch (err) {
@@ -49,6 +45,38 @@ export const Dashboard: React.FC = () => {
       setLoading(false);
     }
   }, []);
+
+  /**
+   * Derive stats directly from the articles list (single source of truth).
+   *
+   * The pipeline overwrites GREEN/YELLOW with PUBLISHED once an article is
+   * sent to WordPress, so the separate /api/dashboard/stats endpoint always
+   * shows Green=0, Yellow=0 even when many articles passed editorial review.
+   * Computing here from the already-fetched article list gives accurate counts:
+   *
+   *   green  = GREEN + PUBLISHED  (passed QC; PUBLISHED is the best outcome)
+   *   yellow = YELLOW             (passed with auto-fix, not yet published)
+   *   red    = RED                (needs human review)
+   */
+  const stats = useMemo<DashboardStats | null>(() => {
+    if (articles.length === 0) return null;
+    return {
+      total:      articles.length,
+      green:      articles.filter((a) => a.status === 'GREEN' || a.status === 'PUBLISHED').length,
+      yellow:     articles.filter((a) => a.status === 'YELLOW').length,
+      red:        articles.filter((a) => a.status === 'RED').length,
+      processing: articles.filter((a) => a.status === 'PROCESSING').length,
+      published:  articles.filter((a) => a.status === 'PUBLISHED').length,
+      failed:     articles.filter((a) => a.status === 'FAILED').length,
+      byPillar: {
+        anime:        articles.filter((a) => a.pillar === 'anime').length,
+        gaming:       articles.filter((a) => a.pillar === 'gaming').length,
+        infotainment: articles.filter((a) => a.pillar === 'infotainment').length,
+        manga:        articles.filter((a) => a.pillar === 'manga').length,
+        toys:         articles.filter((a) => a.pillar === 'toys').length,
+      },
+    };
+  }, [articles]);
 
   // Initial fetch
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -188,7 +216,7 @@ export const Dashboard: React.FC = () => {
       <footer className="border-t border-newsroom-border py-3 px-4">
         <div className="max-w-screen-2xl mx-auto flex items-center justify-between">
           <p className="text-xs text-newsroom-subtle font-mono">
-            Synthetic Newsroom POC v1.0 — 5 Content Pillars — Grok-4-1-fast-reasoning
+            Synthetic Newsroom POC v1.0 — 5 Content Pillars — DeepSeek V4 Flash
           </p>
           <p className="text-xs text-newsroom-subtle font-mono">
             {stats?.total ?? 0} articles total

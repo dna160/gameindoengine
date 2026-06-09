@@ -289,7 +289,10 @@ export const NewsroomFloor: React.FC<NewsroomFloorProps> = ({
       {stats && (
         <>
           <div className="grid grid-cols-3 gap-2">
-            <StatBlock label="Green" value={stats.green} color="text-newsroom-green" />
+            {/* Green = GREEN + PUBLISHED: articles that passed editorial QC.
+                PUBLISHED overwrites GREEN/YELLOW in the DB once sent to WP,
+                so both are combined here to accurately show passed articles. */}
+            <StatBlock label="Passed" value={stats.green} color="text-newsroom-green" />
             <StatBlock label="Yellow" value={stats.yellow} color="text-newsroom-yellow" />
             <StatBlock label="Red" value={stats.red} color="text-newsroom-red" />
           </div>
