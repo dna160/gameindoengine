@@ -131,21 +131,33 @@ export async function uploadImageFromUrl(
                    contentType.includes('webp') ? 'webp' : 'jpg';
   const filename = `article-image-${Date.now()}.${ext}`;
 
-  // Upload via multipart/form-data — more reliable than raw binary across PHP
-  // configurations. PHP populates $_FILES['file'] which WP REST API reads via
-  // upload_from_file(). Raw Buffer POSTs can arrive empty in PHP's php://input
-  // depending on server config and undici version.
+  console.log(`[WpApiClient] Uploading ${filename} (${imageBuffer.length} bytes, ${contentType}) to ${apiBase}/media`);
+
+  // Attempt 1: multipart/form-data — PHP populates $_FILES['file']
   const form = new FormData();
   form.append('file', new Blob([imageBuffer], { type: contentType }), filename);
 
-  const uploadResponse = await fetch(`${apiBase}/media`, {
+  let uploadResponse = await fetch(`${apiBase}/media`, {
     method:  'POST',
-    headers: {
-      Authorization: auth,
-      // Do NOT set Content-Type here — fetch sets multipart/form-data + boundary
-    },
-    body: form,
+    headers: { Authorization: auth },
+    body:    form,
   });
+
+  // Attempt 2: raw binary with Content-Disposition (WP upload_from_data path)
+  if (!uploadResponse.ok) {
+    const err1 = await uploadResponse.text();
+    console.warn(`[WpApiClient] FormData upload failed (${uploadResponse.status}): ${err1.slice(0, 120)} — retrying as binary`);
+
+    uploadResponse = await fetch(`${apiBase}/media`, {
+      method:  'POST',
+      headers: {
+        Authorization:         auth,
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Type':        contentType,
+      },
+      body: imageBuffer,
+    });
+  }
 
   if (!uploadResponse.ok) {
     const text = await uploadResponse.text();
@@ -153,6 +165,7 @@ export async function uploadImageFromUrl(
   }
 
   const media = (await uploadResponse.json()) as WpMediaResponse;
+  console.log(`[WpApiClient] Upload OK → media.id=${media.id} url=${media.source_url}`);
 
   // Set alt_text via PATCH (POST in WP REST convention)
   try {

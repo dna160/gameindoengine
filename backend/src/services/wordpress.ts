@@ -100,28 +100,40 @@ export async function uploadImageFromUrl(
     throw new Error(`Failed to download image from ${imageUrl}: ${imgResponse.status}`);
   }
 
-  const imageBuffer = await imgResponse.arrayBuffer();
-  const contentType = imgResponse.headers.get('content-type') || 'image/jpeg';
+  const rawBuffer  = await imgResponse.arrayBuffer();
+  const imageBuffer = Buffer.from(rawBuffer);
+  const contentType = (imgResponse.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
   const ext = contentType.includes('png') ? 'png' :
                contentType.includes('gif') ? 'gif' :
                contentType.includes('webp') ? 'webp' : 'jpg';
   const filename = `article-image-${Date.now()}.${ext}`;
 
-  // ── Step 2: upload to WP media library via multipart/form-data ──────────
-  // Raw Buffer POSTs arrive as an empty php://input on some PHP/server configs
-  // (Node.js v24 undici sends chunked encoding which PHP may not read).
-  // FormData lets PHP populate $_FILES['file'] reliably.
+  console.log(`[WordPress] Uploading ${filename} (${imageBuffer.length} bytes, ${contentType})`);
+
+  // ── Step 2: upload — attempt FormData, fall back to raw binary ───────────
   const form = new FormData();
   form.append('file', new Blob([imageBuffer], { type: contentType }), filename);
 
-  const uploadResponse = await fetch(`${apiBase}/media`, {
+  let uploadResponse = await fetch(`${apiBase}/media`, {
     method: 'POST',
-    headers: {
-      Authorization: auth,
-      // No Content-Type — fetch sets multipart/form-data + boundary automatically
-    },
+    headers: { Authorization: auth },
     body: form,
   });
+
+  if (!uploadResponse.ok) {
+    const err1 = await uploadResponse.text();
+    console.warn(`[WordPress] FormData upload failed (${uploadResponse.status}): ${err1.slice(0, 120)} — retrying as binary`);
+
+    uploadResponse = await fetch(`${apiBase}/media`, {
+      method: 'POST',
+      headers: {
+        Authorization:         auth,
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Type':        contentType,
+      },
+      body: imageBuffer,
+    });
+  }
 
   if (!uploadResponse.ok) {
     const text = await uploadResponse.text();
@@ -129,6 +141,7 @@ export async function uploadImageFromUrl(
   }
 
   const media = (await uploadResponse.json()) as WpMediaResponse;
+  console.log(`[WordPress] Upload OK → media.id=${media.id}`);
 
   // ── Step 3: PATCH to set alt_text and title (binary upload ignores these) ─
   try {
