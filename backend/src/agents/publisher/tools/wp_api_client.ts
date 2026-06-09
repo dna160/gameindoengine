@@ -82,8 +82,16 @@ export async function uploadImageFromUrl(
 ): Promise<WpMediaResponse> {
   const { apiBase, auth } = getConfig();
 
-  // Download source image
-  const imgResponse = await fetch(imageUrl);
+  // Download source image — browser User-Agent required; bare fetch() returns 403
+  // on Cloudflare/CDN-protected image hosts (imgur, MAL, wikia, twimg, etc.),
+  // which silently kills the upload and leaves featuredMediaId undefined.
+  const imgResponse = await fetch(imageUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept':     'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      'Referer':    new URL(imageUrl).origin + '/',
+    },
+  });
   if (!imgResponse.ok) {
     throw new Error(`Failed to download image from ${imageUrl}: ${imgResponse.status}`);
   }
