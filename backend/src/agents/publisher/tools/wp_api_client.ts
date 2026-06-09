@@ -131,33 +131,18 @@ export async function uploadImageFromUrl(
                    contentType.includes('webp') ? 'webp' : 'jpg';
   const filename = `article-image-${Date.now()}.${ext}`;
 
-  console.log(`[WpApiClient] Uploading ${filename} (${imageBuffer.length} bytes, ${contentType}) to ${apiBase}/media`);
+  const mimeType = contentType.split(';')[0].trim();
+  console.log(`[WpApiClient] Uploading ${filename} (${imageBuffer.length} bytes, ${mimeType})`);
 
-  // Attempt 1: multipart/form-data — PHP populates $_FILES['file']
-  const form = new FormData();
-  form.append('file', new Blob([imageBuffer], { type: contentType }), filename);
-
-  let uploadResponse = await fetch(`${apiBase}/media`, {
+  const uploadResponse = await fetch(`${apiBase}/media`, {
     method:  'POST',
-    headers: { Authorization: auth },
-    body:    form,
+    headers: {
+      Authorization:         auth,
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type':        mimeType,
+    },
+    body: imageBuffer,
   });
-
-  // Attempt 2: raw binary with Content-Disposition (WP upload_from_data path)
-  if (!uploadResponse.ok) {
-    const err1 = await uploadResponse.text();
-    console.warn(`[WpApiClient] FormData upload failed (${uploadResponse.status}): ${err1.slice(0, 120)} — retrying as binary`);
-
-    uploadResponse = await fetch(`${apiBase}/media`, {
-      method:  'POST',
-      headers: {
-        Authorization:         auth,
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Type':        contentType,
-      },
-      body: imageBuffer,
-    });
-  }
 
   if (!uploadResponse.ok) {
     const text = await uploadResponse.text();
@@ -165,7 +150,7 @@ export async function uploadImageFromUrl(
   }
 
   const media = (await uploadResponse.json()) as WpMediaResponse;
-  console.log(`[WpApiClient] Upload OK → media.id=${media.id} url=${media.source_url}`);
+  console.log(`[WpApiClient] Upload OK → media.id=${media.id}`);
 
   // Set alt_text via PATCH (POST in WP REST convention)
   try {

@@ -85,55 +85,60 @@ export async function uploadImageFromUrl(
   const apiBase = getApiBase();
   const auth = getAuthHeader();
 
-  // ── Step 1: download the source image ───────────────────────────────────
-  // Browser User-Agent required — bare fetch() returns 403 on CDN-protected
-  // hosts (Cloudflare, imgur, MAL, wikia, twimg, etc.), which kills the upload
-  // silently and leaves featuredMediaId undefined.
-  const imgResponse = await fetch(imageUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept':     'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-      'Referer':    new URL(imageUrl).origin + '/',
-    },
-  });
-  if (!imgResponse.ok) {
-    throw new Error(`Failed to download image from ${imageUrl}: ${imgResponse.status}`);
+  // ── Step 1: download the source image (two-stage fallback) ──────────────
+  const BROWSER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept':     'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    'Referer':    (() => { try { return new URL(imageUrl).origin + '/'; } catch { return ''; } })(),
+  };
+
+  const isImageContentType = (ct: string | null) =>
+    !!ct && (ct.startsWith('image/') || ct.includes('octet-stream'));
+
+  let imageBuffer: Buffer;
+  let mimeType: string;
+
+  const directRes = await fetch(imageUrl, { headers: BROWSER_HEADERS }).catch(() => null);
+  const directCt  = directRes?.headers.get('content-type') ?? null;
+  const directBuf = directRes?.ok && isImageContentType(directCt)
+    ? Buffer.from(await directRes.arrayBuffer())
+    : null;
+
+  if (directBuf && directBuf.length > 0) {
+    imageBuffer = directBuf;
+    mimeType    = directCt!;
+  } else {
+    const stripped = imageUrl.replace(/^https?:\/\//, '');
+    const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(stripped)}&output=jpg&q=85`;
+    const proxyRes = await fetch(proxyUrl).catch(() => null);
+    const proxyBuf = proxyRes?.ok ? Buffer.from(await proxyRes.arrayBuffer()) : null;
+
+    if (!proxyBuf || proxyBuf.length === 0) {
+      throw new Error(`Image not downloadable (direct + proxy both failed): ${imageUrl}`);
+    }
+    imageBuffer = proxyBuf;
+    mimeType    = 'image/jpeg';
+    console.log(`[WordPress] Image via weserv.nl proxy: ${imageUrl}`);
   }
 
-  const rawBuffer  = await imgResponse.arrayBuffer();
-  const imageBuffer = Buffer.from(rawBuffer);
-  const contentType = (imgResponse.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
-  const ext = contentType.includes('png') ? 'png' :
-               contentType.includes('gif') ? 'gif' :
-               contentType.includes('webp') ? 'webp' : 'jpg';
+  mimeType = mimeType.split(';')[0].trim();
+  const ext = mimeType.includes('png') ? 'png' :
+               mimeType.includes('gif') ? 'gif' :
+               mimeType.includes('webp') ? 'webp' : 'jpg';
   const filename = `article-image-${Date.now()}.${ext}`;
 
-  console.log(`[WordPress] Uploading ${filename} (${imageBuffer.length} bytes, ${contentType})`);
+  console.log(`[WordPress] Uploading ${filename} (${imageBuffer.length} bytes, ${mimeType})`);
 
-  // ── Step 2: upload — attempt FormData, fall back to raw binary ───────────
-  const form = new FormData();
-  form.append('file', new Blob([imageBuffer], { type: contentType }), filename);
-
-  let uploadResponse = await fetch(`${apiBase}/media`, {
+  // ── Step 2: upload binary to WP media library ────────────────────────────
+  const uploadResponse = await fetch(`${apiBase}/media`, {
     method: 'POST',
-    headers: { Authorization: auth },
-    body: form,
+    headers: {
+      Authorization:         auth,
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type':        mimeType,
+    },
+    body: imageBuffer,
   });
-
-  if (!uploadResponse.ok) {
-    const err1 = await uploadResponse.text();
-    console.warn(`[WordPress] FormData upload failed (${uploadResponse.status}): ${err1.slice(0, 120)} — retrying as binary`);
-
-    uploadResponse = await fetch(`${apiBase}/media`, {
-      method: 'POST',
-      headers: {
-        Authorization:         auth,
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Type':        contentType,
-      },
-      body: imageBuffer,
-    });
-  }
 
   if (!uploadResponse.ok) {
     const text = await uploadResponse.text();
