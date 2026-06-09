@@ -131,15 +131,20 @@ export async function uploadImageFromUrl(
                    contentType.includes('webp') ? 'webp' : 'jpg';
   const filename = `article-image-${Date.now()}.${ext}`;
 
-  // Upload binary
+  // Upload via multipart/form-data — more reliable than raw binary across PHP
+  // configurations. PHP populates $_FILES['file'] which WP REST API reads via
+  // upload_from_file(). Raw Buffer POSTs can arrive empty in PHP's php://input
+  // depending on server config and undici version.
+  const form = new FormData();
+  form.append('file', new Blob([imageBuffer], { type: contentType }), filename);
+
   const uploadResponse = await fetch(`${apiBase}/media`, {
     method:  'POST',
     headers: {
-      Authorization:        auth,
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Type':        contentType,
+      Authorization: auth,
+      // Do NOT set Content-Type here — fetch sets multipart/form-data + boundary
     },
-    body: imageBuffer,
+    body: form,
   });
 
   if (!uploadResponse.ok) {
@@ -183,14 +188,15 @@ export async function uploadImageBuffer(
 ): Promise<WpMediaResponse> {
   const { apiBase, auth } = getConfig();
 
+  const form = new FormData();
+  form.append('file', new Blob([imageBuffer], { type: mimeType }), filename);
+
   const uploadResponse = await fetch(`${apiBase}/media`, {
     method:  'POST',
     headers: {
-      Authorization:         auth,
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Type':        mimeType,
+      Authorization: auth,
     },
-    body: imageBuffer,
+    body: form,
   });
 
   if (!uploadResponse.ok) {
