@@ -83,26 +83,47 @@ export async function uploadImageFromUrl(
 ): Promise<WpMediaResponse> {
   const { apiBase, auth } = getConfig();
 
-  // Download source image — browser User-Agent required; bare fetch() returns 403
-  // on Cloudflare/CDN-protected image hosts (imgur, MAL, wikia, twimg, etc.),
-  // which silently kills the upload and leaves featuredMediaId undefined.
-  const imgResponse = await fetch(imageUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept':     'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-      'Referer':    new URL(imageUrl).origin + '/',
-    },
-  });
-  if (!imgResponse.ok) {
-    throw new Error(`Failed to download image from ${imageUrl}: ${imgResponse.status}`);
-  }
+  // Download source image.
+  // Strategy: try direct download with browser headers first.
+  // If the response is non-OK OR the body is empty (some CDNs return HTTP 200
+  // with 0 bytes for bot requests), fall back to weserv.nl which fetches on
+  // our behalf and returns the real image bytes.
+  const BROWSER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept':     'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    'Referer':    (() => { try { return new URL(imageUrl).origin + '/'; } catch { return ''; } })(),
+  };
 
-  const imageBuffer  = await imgResponse.arrayBuffer();
-  const contentType  = imgResponse.headers.get('content-type') || 'image/jpeg';
-  const ext          = contentType.includes('png')  ? 'png'  :
-                       contentType.includes('gif')  ? 'gif'  :
-                       contentType.includes('webp') ? 'webp' : 'jpg';
-  const filename     = `article-image-${Date.now()}.${ext}`;
+  let imageBuffer: ArrayBuffer;
+  let contentType: string;
+
+  const directRes = await fetch(imageUrl, { headers: BROWSER_HEADERS }).catch(() => null);
+  const directBuf = directRes?.ok ? await directRes.arrayBuffer() : null;
+
+  if (directBuf && directBuf.byteLength > 0) {
+    // Direct download succeeded and returned actual bytes
+    imageBuffer  = directBuf;
+    contentType  = directRes!.headers.get('content-type') || 'image/jpeg';
+  } else {
+    // Direct download failed or returned empty body — use weserv.nl proxy
+    const stripped  = imageUrl.replace(/^https?:\/\//, '');
+    const proxyUrl  = `https://images.weserv.nl/?url=${encodeURIComponent(stripped)}&output=jpg&q=85`;
+    const proxyRes  = await fetch(proxyUrl, { headers: BROWSER_HEADERS });
+    if (!proxyRes.ok) {
+      throw new Error(`Failed to download image (direct + proxy both failed): ${imageUrl}`);
+    }
+    const proxyBuf = await proxyRes.arrayBuffer();
+    if (proxyBuf.byteLength === 0) {
+      throw new Error(`Downloaded image is empty via proxy: ${imageUrl}`);
+    }
+    imageBuffer = proxyBuf;
+    contentType = 'image/jpeg'; // weserv.nl always returns JPEG when output=jpg
+    console.log(`[WpApiClient] Image served via weserv.nl proxy: ${imageUrl}`);
+  }
+  const ext      = contentType.includes('png')  ? 'png'  :
+                   contentType.includes('gif')  ? 'gif'  :
+                   contentType.includes('webp') ? 'webp' : 'jpg';
+  const filename = `article-image-${Date.now()}.${ext}`;
 
   // Upload binary
   const uploadResponse = await fetch(`${apiBase}/media`, {
