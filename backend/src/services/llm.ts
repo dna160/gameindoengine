@@ -134,7 +134,7 @@ export async function createCompletion(params: {
 
 // ── High-level chat helper ────────────────────────────────────────────────────
 
-const MAX_TOKENS_CAP   = 8192; // never exceed DeepSeek Flash's output limit
+const MAX_TOKENS_CAP   = 32000; // DeepSeek Flash supports up to 32K output tokens
 const MAX_ATTEMPTS     = 4;    // up to 3 token-doubling retries + 1 empty retry
 
 /**
@@ -149,7 +149,7 @@ export async function chat(
   messages: ChatMessage[],
   opts: { temperature?: number; maxTokens?: number } = {}
 ): Promise<string> {
-  let maxTokens = opts.maxTokens ?? 4096;
+  let maxTokens = opts.maxTokens ?? 32000;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     await rateLimiter.acquire();
