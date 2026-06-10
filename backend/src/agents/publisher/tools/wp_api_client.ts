@@ -252,28 +252,24 @@ export async function publishToWordPress(params: {
   const { title, images, pillar, authorName } = params;
 
   let featuredMediaId: number | undefined;
-  const uploadedImages: Array<{ originalUrl: string; wpUrl: string }> = [];
 
-  // Upload all images
-  for (const img of images) {
+  // Upload ONLY the featured image (first image flagged isFeatured, or index 0).
+  // WordPress generates 6 size variants per upload; uploading all 3 article images
+  // creates 18 files per article and fills disk rapidly. Non-featured images stay
+  // as external URLs in the HTML — they load fine from the reader's browser.
+  const featuredImg = images.find((img) => img.isFeatured) ?? images[0];
+  if (featuredImg) {
     try {
-      const media = await uploadImageFromUrl(img.url, img.alt);
-      uploadedImages.push({ originalUrl: img.url, wpUrl: media.source_url });
-      if (img.isFeatured) {
-        featuredMediaId = media.id;
-      } else if (featuredMediaId === undefined) {
-        featuredMediaId = media.id; // first-upload fallback
-      }
+      const media = await uploadImageFromUrl(featuredImg.url, featuredImg.alt);
+      featuredMediaId = media.id;
+      console.log(`[WpApiClient] Featured image uploaded → media.id=${media.id}`);
     } catch (err) {
-      console.warn(`[WpApiClient] Failed to upload image ${img.url}:`, (err as Error).message);
+      console.warn(`[WpApiClient] Failed to upload featured image ${featuredImg.url}:`, (err as Error).message);
     }
   }
 
-  // Replace original image URLs with WP-hosted URLs in the HTML
-  let finalHtml = params.contentHtml;
-  for (const uploaded of uploadedImages) {
-    finalHtml = finalHtml.split(uploaded.originalUrl).join(uploaded.wpUrl);
-  }
+  // HTML content keeps external image URLs as-is (no URL replacement needed).
+  const finalHtml = params.contentHtml;
 
   const categoryId = CATEGORY_IDS[pillar];
   const authorId   = authorName ? AUTHOR_IDS[authorName] : undefined;
