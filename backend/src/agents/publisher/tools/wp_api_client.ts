@@ -317,7 +317,40 @@ export async function publishToWordPress(params: {
     content:         finalHtml,
   });
 
-  console.log(`[WpApiClient] Post ${post.id} created — WP returned featured_media=${post.featured_media}`);
+  console.log(
+    `[WpApiClient] Post ${post.id} created — WP returned featured_media=${post.featured_media}` +
+    (keyphrase ? ` | keyphrase="${keyphrase}"` : '')
+  );
+
+  // ── Yoast SEO meta PATCH ───────────────────────────────────────────────────
+  // WordPress only writes custom meta keys that are registered with
+  // show_in_rest:true.  Yoast SEO registers its keys, but some Hostinger
+  // configurations silently drop unrecognised meta on the main POST.
+  // We send a dedicated lightweight PATCH containing only the Yoast fields
+  // so they are always written, mirroring the same pattern used for featured_media.
+  if (keyphrase || metaDescription) {
+    const { apiBase: yapiBase, auth: yauth } = getConfig();
+    try {
+      const yoastPatch = await fetch(`${yapiBase}/posts/${post.id}`, {
+        method:  'POST',
+        headers: { Authorization: yauth, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          meta: {
+            ...(keyphrase       ? { _yoast_wpseo_focuskw:  keyphrase }       : {}),
+            ...(metaDescription ? { _yoast_wpseo_metadesc: metaDescription } : {}),
+          },
+        }),
+      });
+      if (yoastPatch.ok) {
+        console.log(`[WpApiClient] Yoast meta PATCH OK — focuskw="${keyphrase}"`);
+      } else {
+        const errText = await yoastPatch.text().catch(() => '');
+        console.warn(`[WpApiClient] Yoast meta PATCH failed: ${yoastPatch.status} — ${errText.slice(0, 200)}`);
+      }
+    } catch (err) {
+      console.warn(`[WpApiClient] Yoast meta PATCH threw:`, (err as Error).message);
+    }
+  }
 
   // Belt-and-suspenders: if WordPress still shows featured_media=0 after
   // creation (WAF stripped the field), PATCH it explicitly with a tiny payload.

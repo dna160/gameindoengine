@@ -64,9 +64,73 @@ export class Editor {
       }
     }
 
+    // ── SEO structural pre-checks ─────────────────────────────────────────────
+    // These are deterministic regex/count checks — no LLM needed.
+    // Any failure routes back to the Copywriter with specific fix instructions.
+    // Mirrors the exact Yoast SEO requirements the article must satisfy.
+
+    const content   = draft.content;
+    const wordCount = content.trim().split(/\s+/).filter((w) => w.length > 0).length;
+
+    // 1. Word count ≥ 300 (Yoast minimum; editor was previously allowing 200)
+    if (wordCount < 300) {
+      this.log(`[Editor] SEO pre-check FAILED: word count ${wordCount} < 300`);
+      return {
+        passed: false, autoFixed: false,
+        feedback: `WRITING_REVISION: Article is only ${wordCount} words. Expand to at least 300 words by adding detail to existing sections — do not add new topics.`,
+        issueType: 'MINOR', hallucinations: [],
+      };
+    }
+
+    // 2. Outbound link — at least one markdown link to an external (non-popshck) domain
+    const hasOutboundLink = /\[.+?\]\(https?:\/\/(?!(?:www\.)?popshck\.com).+?\)/i.test(content);
+    if (!hasOutboundLink) {
+      this.log(`[Editor] SEO pre-check FAILED: no outbound link found`);
+      return {
+        passed: false, autoFixed: false,
+        feedback: `WRITING_REVISION: No outbound link found. Add a hyperlink to the original source article in the body text, e.g. [baca selengkapnya di sumber resmi](${draft.sourceUrl}).`,
+        issueType: 'MINOR', hallucinations: [],
+      };
+    }
+
+    // 3. Internal link — at least one link to popshck.com
+    const hasInternalLink = /\[.+?\]\(https?:\/\/(?:www\.)?popshck\.com.+?\)/i.test(content);
+    if (!hasInternalLink) {
+      this.log(`[Editor] SEO pre-check FAILED: no internal popshck.com link found`);
+      return {
+        passed: false, autoFixed: false,
+        feedback: `WRITING_REVISION: No internal link to popshck.com found. Add a hyperlink to the relevant Popshck category page, e.g. [berita anime lainnya](https://popshck.com/category/anime/).`,
+        issueType: 'MINOR', hallucinations: [],
+      };
+    }
+
+    // 4. H2 subheading — at least one ## heading in the body
+    const hasH2 = /^## .+/m.test(content);
+    if (!hasH2) {
+      this.log(`[Editor] SEO pre-check FAILED: no H2 subheading found`);
+      return {
+        passed: false, autoFixed: false,
+        feedback: `WRITING_REVISION: No H2 (##) subheading found. Add at least one H2 subheading that names the article's main subject (the topic, not a generic phrase).`,
+        issueType: 'MINOR', hallucinations: [],
+      };
+    }
+
+    // 5. Image with descriptive alt text (not just "featured" placeholder)
+    const imgMatches = [...content.matchAll(/!\[([^\]]*)\]\([^)]+\)/g)];
+    const allAltsGeneric = imgMatches.length > 0 && imgMatches.every(
+      (m) => !m[1] || m[1].trim().toLowerCase() === 'featured' || m[1].trim().length < 5
+    );
+    if (allAltsGeneric) {
+      this.log(`[Editor] SEO pre-check FAILED: all image alt texts are generic`);
+      return {
+        passed: false, autoFixed: false,
+        feedback: `WRITING_REVISION: All image alt texts are missing or generic ("featured"). Replace with descriptive alt text that includes the article subject, e.g. ![Genshin Impact update karakter baru](URL).`,
+        issueType: 'MINOR', hallucinations: [],
+      };
+    }
+
     // ── LLM editorial review ─────────────────────────────────────────────────
     const pillarLabel = PILLAR_LABELS[draft.pillar];
-    const wordCount = draft.content.trim().split(/\s+/).length;
     const attemptNumber = revisionCount + 1; // 1-indexed for the LLM
 
     const imageList = draft.images
@@ -80,7 +144,7 @@ export class Editor {
 [Article Draft]:
 Title: "${draft.title}"
 Pillar: "${pillarLabel}"
-Word Count: ${wordCount} (acceptable range: 200–400)
+Word Count: ${wordCount} (acceptable range: 300–400)
 
 [Attempt Number]: ${attemptNumber} of 3
 
@@ -108,7 +172,7 @@ Do NOT fail an article purely because the developer is Chinese or Korean.
    b. **URL plausibility:** Does the image URL domain/path look like a legitimate media source? Generic stock-photo URLs (e.g. picsum, lorempixel, placeholder) or obviously off-topic paths → FAIL.
    c. **Image validity:** The HTTP pre-check above already caught broken URLs — trust that images which reached this step are accessible.
    If alt text clearly contradicts the article subject, route back with error_category "INCOMPLETE_INFO".
-5. **Word Count:** Must be between 200 and 400 words.
+5. **Word Count:** Must be between 300 and 400 words.
 6. **Structure:** Clear intro, body sections with headers, forward-looking conclusion.
 
 **OUTPUT FORMAT AND ROUTING RULES:**
