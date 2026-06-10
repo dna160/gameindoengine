@@ -25,6 +25,113 @@ export class Researcher {
     this.log = log;
   }
 
+  // ── Image URL probe ─────────────────────────────────────────────────────────
+  // Verifies an image URL actually serves a displayable image before approving
+  // it.  A bare HEAD request is not enough — CDNs (Cloudflare, Nexus Mods,
+  // YouTube ytimg) return HTTP 200 to headless probes but serve a JS challenge
+  // page or an empty body to the actual <img> fetch.  This probe:
+  //   1. GETs the URL with Chrome-like headers
+  //   2. Validates Content-Type is image/* (not text/html from a challenge page)
+  //   3. Reads the first bytes and checks for known image magic bytes
+  //   4. If blocked (403/401/429 or HTML masquerading as 200), retries via
+  //      images.weserv.nl — the same proxy that wp_api_client uses for upload
+
+  private static readonly PROBE_BROWSER_HEADERS: Record<string, string> = {
+    'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept':          'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Cache-Control':   'no-cache',
+  };
+
+  // JPEG / PNG / WebP(RIFF) / GIF / BMP / ICO
+  private static readonly IMAGE_MAGIC: readonly number[][] = [
+    [0xFF, 0xD8, 0xFF],
+    [0x89, 0x50, 0x4E, 0x47],
+    [0x52, 0x49, 0x46, 0x46],
+    [0x47, 0x49, 0x46, 0x38],
+    [0x42, 0x4D],
+    [0x00, 0x00, 0x01, 0x00],
+  ];
+
+  private static hasMagicBytes(buf: Uint8Array): boolean {
+    return Researcher.IMAGE_MAGIC.some((sig) => sig.every((byte, i) => buf[i] === byte));
+  }
+
+  private async fetchImageBytes(
+    url: string,
+    timeoutMs = 8_000
+  ): Promise<{ ok: boolean; reason: string }> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method:  'GET',
+        headers: Researcher.PROBE_BROWSER_HEADERS,
+        signal:  controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        await res.body?.cancel().catch(() => undefined);
+        return { ok: false, reason: `HTTP ${res.status}` };
+      }
+
+      const ct = (res.headers.get('content-type') ?? '').toLowerCase();
+      if (!ct.includes('image/') && !ct.includes('application/octet-stream')) {
+        await res.body?.cancel().catch(() => undefined);
+        return { ok: false, reason: `bad Content-Type: ${ct.split(';')[0].trim() || '(none)'}` };
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) return { ok: false, reason: 'no body reader' };
+
+      const { value } = await reader.read();
+      await reader.cancel().catch(() => undefined);
+
+      if (!value || value.length < 2) return { ok: false, reason: 'empty body' };
+      if (!Researcher.hasMagicBytes(value)) {
+        return { ok: false, reason: `not an image (first byte 0x${value[0].toString(16).padStart(2, '0')})` };
+      }
+
+      return { ok: true, reason: 'ok' };
+    } catch (err) {
+      clearTimeout(timer);
+      const msg = (err as Error).message ?? String(err);
+      return { ok: false, reason: msg.toLowerCase().includes('abort') ? 'timeout' : msg };
+    }
+  }
+
+  private async probeImageUrl(url: string): Promise<boolean> {
+    // Stage 1: direct fetch with browser headers
+    const direct = await this.fetchImageBytes(url);
+    if (direct.ok) return true;
+
+    // Stage 2: weserv.nl proxy — handles CDNs that block non-browser GETs
+    const isBlocked =
+      direct.reason === 'HTTP 403' ||
+      direct.reason === 'HTTP 401' ||
+      direct.reason === 'HTTP 429' ||
+      direct.reason.includes('text/html') ||
+      direct.reason.includes('text/plain');
+
+    if (isBlocked) {
+      const stripped  = url.replace(/^https?:\/\//, '');
+      const proxyUrl  = `https://images.weserv.nl/?url=${encodeURIComponent(stripped)}&output=jpg&q=80`;
+      const proxied   = await this.fetchImageBytes(proxyUrl);
+      if (proxied.ok) {
+        this.log(`[Researcher] Image reachable via proxy (direct blocked: ${direct.reason}): ${url}`);
+        return true;
+      }
+      this.log(`[Researcher] Image probe FAILED — direct: ${direct.reason}; proxy: ${proxied.reason}: ${url}`);
+      return false;
+    }
+
+    this.log(`[Researcher] Image probe FAILED — ${direct.reason}: ${url}`);
+    return false;
+  }
+
+  // ── Topic evaluation ─────────────────────────────────────────────────────────
+
   /**
    * Deep evaluate whether an article is relevant to its declared pillar.
    * Returns { approved: boolean; reason?: string }
@@ -234,10 +341,15 @@ Respond ONLY with a valid JSON array of exactly 5 query strings (no markdown, no
         for (const img of candidates) triedUrls.add(img.imageUrl);
 
         const results = await Promise.all(
-          candidates.map(async (img) => ({
-            img,
-            isRelevant: await evaluateImageRelevance(img.imageUrl, title, PILLAR_LABELS[pillar]),
-          }))
+          candidates.map(async (img) => {
+            // Gate 1: probe — confirms the URL actually serves a real image
+            // (catches CDN bot-walls, empty bodies, HTML challenge pages)
+            const reachable = await this.probeImageUrl(img.imageUrl);
+            if (!reachable) return { img, isRelevant: false };
+            // Gate 2: relevance — confirms the image is topically appropriate
+            const isRelevant = await evaluateImageRelevance(img.imageUrl, title, PILLAR_LABELS[pillar]);
+            return { img, isRelevant };
+          })
         );
 
         for (const { img, isRelevant } of results) {
