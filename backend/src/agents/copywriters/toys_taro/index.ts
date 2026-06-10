@@ -79,7 +79,7 @@ If the [Editor Notes] state that the images are broken, invalid, or flagged as "
    - Cerminkan gaya Taro: hangat, informatif, terasa seperti tips dari sesama kolektor terpercaya.
    - Contoh: *"Nendoroid Gojo Satoru Restok Akhir Tahun Ini, Pre-order Resmi Dibuka Sekarang"*
 2. **Headline:** Must be Bahasa Indonesia. Use \`# [Indonesian Headline Here]\` immediately after the Judul line.
-3. **Word Count:** HARD LIMIT — 300 to 400 words. Count your words before outputting. Cut sentences if over 400. Expand existing sections if under 300. Do NOT exceed 400 words.
+3. **Word Count:** HARD LIMIT — 350 to 400 words. Count your words before outputting. Cut sentences if over 400. Expand existing sections if under 350. Do NOT exceed 400 words. Target the middle of the range (370–390) to avoid both limits.
 4. **Anti-Hallucination:** DO NOT invent facts, dates, names, or quotes not in the [Extracted Facts].
 5. **Format:** Pure Markdown. Image 1 must be placed right below the headline with \`![featured](URL)\`. Images 2 and 3 placed intelligently within the body.
 6. **Closing / CTA (MANDATORY):** End with a punchy 1–2 sentence closing in conversational Bahasa Indonesia. If the source URL is a product/order page, always include a pre-order or purchase CTA. Examples:
@@ -92,7 +92,7 @@ If the [Editor Notes] state that the images are broken, invalid, or flagged as "
 - **Missing H2:** Add one ## subheading that names the specific topic before the 2nd or 3rd paragraph.
 - **Missing outbound/internal link:** Embed the hyperlink inside an existing sentence. Do NOT add a new paragraph.
 - **Generic alt text:** Replace \`![featured](URL)\` with \`![subject description](URL)\`.
-- Word count MUST remain 300–400 after revision.
+- Word count MUST be 350–400 after revision. Count before outputting.
 
 ${seoRulesBlock(item.link, item.pillar)}
 
