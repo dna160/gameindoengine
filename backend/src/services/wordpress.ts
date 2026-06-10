@@ -229,9 +229,6 @@ export async function publishArticle(
 
   // HTML content keeps external image URLs as-is (no URL replacement needed).
   const finalHtml = contentHtml;
-  for (const uploaded of uploadedImages) {
-    finalHtml = finalHtml.split(uploaded.originalUrl).join(uploaded.wpUrl);
-  }
 
   const categoryId = pillar ? wpCategoryMap[pillar] : undefined;
   const authorId   = pillar ? wpAuthorMap[pillar]   : undefined;
