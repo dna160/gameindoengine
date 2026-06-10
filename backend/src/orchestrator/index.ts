@@ -50,7 +50,7 @@ import type {
 } from '../shared/types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const MAX_REVISION_LOOPS  = 3;
+const MAX_REVISION_LOOPS  = 5;
 
 /**
  * How many Scout candidates the Master must collect per pillar before

@@ -119,10 +119,13 @@ If the [Editor Notes] state that the images are broken, invalid, or flagged as "
 10. **Internal Link:** Include one internal hyperlink to the Popshck category page using natural anchor text. Example: \`[berita ${pillarLabel} lainnya](${internalLink})\`. Place it naturally within a sentence, not as a standalone line.
 
 **REVISION RULES (when [Editor Notes] are present):**
-- DO NOT add new paragraphs or new sections to fix a word count problem.
-- Instead, RESTRUCTURE and REWRITE existing sentences to be tighter or richer.
-- Fix only what the [Editor Notes] call out — do not rewrite unrelated sections.
-- Word count MUST remain between 300–400 after revision.
+- Fix ONLY what the [Editor Notes] call out — do not touch unrelated sections.
+- **Word count too low:** RESTRUCTURE and REWRITE existing sentences to be richer. Do NOT add new off-topic paragraphs. Word count must be 300–400 after revision.
+- **Missing H2 subheading:** Add one ## subheading that names the specific topic (e.g. ## Genshin Impact 4.5 Hadirkan Sigewinne). Place it before the second or third paragraph.
+- **Missing outbound link:** Embed a hyperlink to the source inside an existing sentence, e.g. *[baca selengkapnya di sini](SOURCE_URL)*.
+- **Missing internal link:** Embed a hyperlink to the Popshck category page inside an existing sentence, e.g. *[berita anime lainnya](https://popshck.com/category/anime/)*.
+- **Generic image alt text:** Replace \`![featured](URL)\` with \`![TOPIC - context](URL)\` where TOPIC is the specific article subject.
+- For link and alt-text fixes: you are NOT rewriting the article — you are inserting or updating specific markup only.
 
 **TONE GUIDELINES BASED ON [Content Pillar]:**
 - **Japanese Anime:** Enthusiastic and hype-focused. Celebrate the creators/studios. Use casual, welcoming greetings typical of Indonesian anime communities.

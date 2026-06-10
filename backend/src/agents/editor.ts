@@ -11,8 +11,17 @@
 
 import { chat, parseJsonResponse } from '../services/llm';
 import { marked } from 'marked';
-import type { DraftArticle, EditorResult } from '../shared/types';
+import type { Pillar, DraftArticle, EditorResult } from '../shared/types';
 import { PILLAR_LABELS } from '../shared/types';
+
+/** Popshck category pages — used when auto-injecting a missing internal link */
+const INTERNAL_CATEGORY_LINKS: Record<Pillar, string> = {
+  anime:         'https://popshck.com/category/anime/',
+  gaming:        'https://popshck.com/category/game/',
+  infotainment:  'https://popshck.com/category/infotainment/',
+  manga:         'https://popshck.com/category/comic/',
+  toys:          'https://popshck.com/category/toys/',
+};
 
 /**
  * HTTP HEAD pre-check for image URLs.
@@ -64,73 +73,75 @@ export class Editor {
       }
     }
 
-    // ── SEO structural pre-checks ─────────────────────────────────────────────
-    // These are deterministic regex/count checks — no LLM needed.
-    // Any failure routes back to the Copywriter with specific fix instructions.
-    // Mirrors the exact Yoast SEO requirements the article must satisfy.
+    // ── SEO checks: FAIL → Copywriter (requires content work) ──────────────────
+    // Word count and H2 subheadings require the Copywriter to expand/restructure.
+    // The editor cannot safely add these without rewriting — route back.
 
-    const content   = draft.content;
-    const wordCount = content.trim().split(/\s+/).filter((w) => w.length > 0).length;
+    const rawWordCount = draft.content.trim().split(/\s+/).filter((w) => w.length > 0).length;
 
-    // 1. Word count ≥ 300 (Yoast minimum; editor was previously allowing 200)
-    if (wordCount < 300) {
-      this.log(`[Editor] SEO pre-check FAILED: word count ${wordCount} < 300`);
+    if (rawWordCount < 300) {
+      this.log(`[Editor] SEO FAIL → Copywriter: word count ${rawWordCount} < 300`);
       return {
         passed: false, autoFixed: false,
-        feedback: `WRITING_REVISION: Article is only ${wordCount} words. Expand to at least 300 words by adding detail to existing sections — do not add new topics.`,
+        feedback: `WRITING_REVISION: Article is only ${rawWordCount} words. Expand to 300–400 words by adding more detail, context, or explanation to existing sections. Do NOT add new topics or sections.`,
         issueType: 'MINOR', hallucinations: [],
       };
     }
 
-    // 2. Outbound link — at least one markdown link to an external (non-popshck) domain
-    const hasOutboundLink = /\[.+?\]\(https?:\/\/(?!(?:www\.)?popshck\.com).+?\)/i.test(content);
-    if (!hasOutboundLink) {
-      this.log(`[Editor] SEO pre-check FAILED: no outbound link found`);
+    if (!/^## .+/m.test(draft.content)) {
+      this.log(`[Editor] SEO FAIL → Copywriter: no H2 (##) subheading`);
       return {
         passed: false, autoFixed: false,
-        feedback: `WRITING_REVISION: No outbound link found. Add a hyperlink to the original source article in the body text, e.g. [baca selengkapnya di sumber resmi](${draft.sourceUrl}).`,
+        feedback: `WRITING_REVISION: No H2 subheading (##) found. Add at least one ## subheading that names the article's specific subject (e.g. ## Genshin Impact Update 4.5 Rilis). Do NOT use generic labels like "Informasi Terbaru".`,
         issueType: 'MINOR', hallucinations: [],
       };
     }
 
-    // 3. Internal link — at least one link to popshck.com
-    const hasInternalLink = /\[.+?\]\(https?:\/\/(?:www\.)?popshck\.com.+?\)/i.test(content);
-    if (!hasInternalLink) {
-      this.log(`[Editor] SEO pre-check FAILED: no internal popshck.com link found`);
-      return {
-        passed: false, autoFixed: false,
-        feedback: `WRITING_REVISION: No internal link to popshck.com found. Add a hyperlink to the relevant Popshck category page, e.g. [berita anime lainnya](https://popshck.com/category/anime/).`,
-        issueType: 'MINOR', hallucinations: [],
-      };
+    // ── SEO auto-fixes (editor handles these, no Copywriter round-trip needed) ──
+    // Outbound link, internal link, and image alt text can be safely injected
+    // without altering the article's prose or structure.
+
+    let workingContent = draft.content;
+    const seoFixes: string[] = [];
+    const pillarLabel = PILLAR_LABELS[draft.pillar];
+
+    // Auto-fix 1: Outbound link — append a "read more" line to the source article
+    if (!/\[.+?\]\(https?:\/\/(?!(?:www\.)?popshck\.com).+?\)/i.test(workingContent)) {
+      workingContent += `\n\n*Sumber: [baca artikel selengkapnya di sini](${draft.sourceUrl})*`;
+      seoFixes.push('outbound link');
     }
 
-    // 4. H2 subheading — at least one ## heading in the body
-    const hasH2 = /^## .+/m.test(content);
-    if (!hasH2) {
-      this.log(`[Editor] SEO pre-check FAILED: no H2 subheading found`);
-      return {
-        passed: false, autoFixed: false,
-        feedback: `WRITING_REVISION: No H2 (##) subheading found. Add at least one H2 subheading that names the article's main subject (the topic, not a generic phrase).`,
-        issueType: 'MINOR', hallucinations: [],
-      };
+    // Auto-fix 2: Internal link — append a category discovery line
+    if (!/\[.+?\]\(https?:\/\/(?:www\.)?popshck\.com.+?\)/i.test(workingContent)) {
+      const internalUrl = INTERNAL_CATEGORY_LINKS[draft.pillar];
+      workingContent += `\n\n*Temukan lebih banyak [berita ${pillarLabel} terkini](${internalUrl}) hanya di Popshck.*`;
+      seoFixes.push('internal link');
     }
 
-    // 5. Image with descriptive alt text (not just "featured" placeholder)
-    const imgMatches = [...content.matchAll(/!\[([^\]]*)\]\([^)]+\)/g)];
-    const allAltsGeneric = imgMatches.length > 0 && imgMatches.every(
+    // Auto-fix 3: Generic image alt text — replace "featured"/blank alts with title
+    const imgAlts = [...workingContent.matchAll(/!\[([^\]]*)\]\([^)]+\)/g)];
+    const hasGenericAlts = imgAlts.some(
       (m) => !m[1] || m[1].trim().toLowerCase() === 'featured' || m[1].trim().length < 5
     );
-    if (allAltsGeneric) {
-      this.log(`[Editor] SEO pre-check FAILED: all image alt texts are generic`);
-      return {
-        passed: false, autoFixed: false,
-        feedback: `WRITING_REVISION: All image alt texts are missing or generic ("featured"). Replace with descriptive alt text that includes the article subject, e.g. ![Genshin Impact update karakter baru](URL).`,
-        issueType: 'MINOR', hallucinations: [],
-      };
+    if (hasGenericAlts) {
+      let imgIdx = 0;
+      workingContent = workingContent.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
+        if (!alt || alt.trim().toLowerCase() === 'featured' || alt.trim().length < 5) {
+          imgIdx++;
+          const newAlt = imgIdx === 1 ? draft.title : `${draft.title} ${imgIdx}`;
+          return `![${newAlt}](${url})`;
+        }
+        return match;
+      });
+      seoFixes.push('image alt text');
     }
 
-    // ── LLM editorial review ─────────────────────────────────────────────────
-    const pillarLabel = PILLAR_LABELS[draft.pillar];
+    if (seoFixes.length > 0) {
+      this.log(`[Editor] SEO auto-fixed: ${seoFixes.join(', ')} — no Copywriter round-trip needed`);
+    }
+
+    // ── LLM editorial review (reviews the auto-fixed content) ────────────────
+    const wordCount     = workingContent.trim().split(/\s+/).filter((w) => w.length > 0).length;
     const attemptNumber = revisionCount + 1; // 1-indexed for the LLM
 
     const imageList = draft.images
@@ -146,11 +157,11 @@ Title: "${draft.title}"
 Pillar: "${pillarLabel}"
 Word Count: ${wordCount} (acceptable range: 300–400)
 
-[Attempt Number]: ${attemptNumber} of 3
+[Attempt Number]: ${attemptNumber} of 5
 
 Content:
 ---
-${draft.content}
+${workingContent}
 ---
 
 [Images] (${draft.images.length} total):
@@ -186,21 +197,21 @@ If the article passes all checks:
   "reason": "All standards met."
 }
 
-If the article fails AND [Attempt Number] is 1 or 2, send it back for revision:
+If the article fails AND [Attempt Number] is 1, 2, 3, or 4, send it back for revision:
 {
   "status": "FAIL",
   "error_category": "WRITING_REVISION",
   "reason": "4–5 word fix instruction"
 }
 
-For image failures on attempt 1 or 2:
+For image failures on attempts 1–4:
 {
   "status": "FAIL",
   "error_category": "INCOMPLETE_INFO",
   "reason": "Broken image URL detected."
 }
 
-**[CRITICAL] FATAL TOPIC REJECTION — if [Attempt Number] is 3 and the article still fails:**
+**[CRITICAL] FATAL TOPIC REJECTION — if [Attempt Number] is 5 and the article still fails:**
 You must declare the topic unsalvageable. Do NOT send it back to the Copywriter.
 {
   "status": "UNSALVAGEABLE",
@@ -209,8 +220,6 @@ You must declare the topic unsalvageable. Do NOT send it back to the Copywriter.
 }`;
 
     try {
-      // Text-only review — DeepSeek V4 Flash does not support multimodal inputs.
-      // Image URLs and alt text are already included in the prompt above as plain text.
       const raw = await chat(
         [{ role: 'user', content: prompt }],
         { temperature: 0.2, maxTokens: 1024 }
@@ -224,12 +233,11 @@ You must declare the topic unsalvageable. Do NOT send it back to the Copywriter.
 
       const passed = result.status === 'PASS';
       const issueType: EditorResult['issueType'] =
-        result.status === 'UNSALVAGEABLE'          ? 'UNSALVAGEABLE' :
-        result.error_category === 'INCOMPLETE_INFO' ? 'IMAGE' :
+        result.status === 'UNSALVAGEABLE'           ? 'UNSALVAGEABLE' :
+        result.error_category === 'INCOMPLETE_INFO'  ? 'IMAGE' :
         result.error_category === 'WRITING_REVISION' ? 'MAJOR' :
         null;
 
-      // Only log failures — pipeline.ts reports final GREEN/YELLOW status on pass
       if (!passed) {
         this.log(
           `[Editor] Review FAIL for "${draft.title}"` +
@@ -240,19 +248,20 @@ You must declare the topic unsalvageable. Do NOT send it back to the Copywriter.
 
       return {
         passed,
-        autoFixed: false,
-        feedback: result.reason || '',
+        autoFixed:    seoFixes.length > 0,
+        fixedContent: seoFixes.length > 0 ? workingContent : undefined,
+        feedback:     result.reason || '',
         issueType,
         hallucinations: [],
       };
     } catch (err) {
       this.log(`[Editor] Review parsing failed: ${(err as Error).message}`);
-      // On parse failure, do a lenient pass to avoid blocking the pipeline
       return {
-        passed: true,
-        autoFixed: false,
-        feedback: 'Editorial review encountered a parsing error. Passing with caution.',
-        issueType: null,
+        passed:       true,
+        autoFixed:    seoFixes.length > 0,
+        fixedContent: seoFixes.length > 0 ? workingContent : undefined,
+        feedback:     'Editorial review encountered a parsing error. Passing with caution.',
+        issueType:    null,
         hallucinations: [],
       };
     }
@@ -278,7 +287,7 @@ You must declare the topic unsalvageable. Do NOT send it back to the Copywriter.
     autoFixed: boolean,
     revisionCount: number
   ): 'GREEN' | 'YELLOW' | 'RED' | 'FAILED' {
-    if (revisionCount >= 3 && !passed) {
+    if (revisionCount >= 5 && !passed) {
       return 'FAILED';
     }
 
