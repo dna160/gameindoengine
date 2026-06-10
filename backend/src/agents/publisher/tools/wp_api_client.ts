@@ -247,15 +247,22 @@ export async function createPost(payload: WpPostPayload): Promise<WpPostResponse
  * Full publish flow: upload images, replace URLs in HTML, create post.
  * Returns WP post ID and live URL.
  */
-/** Convert a keyphrase to a URL-safe WordPress slug */
-function keyphraseToSlug(keyphrase: string): string {
-  return keyphrase
+/** Convert an article title to a URL-safe WordPress slug (max ~60 chars, word boundary). */
+function titleToSlug(title: string): string {
+  const slug = title
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')   // strip non-ASCII (Indonesian chars, symbols)
+    .replace(/[àáâãäå]/g, 'a').replace(/[èéêë]/g, 'e')
+    .replace(/[ìíîï]/g, 'i').replace(/[òóôõö]/g, 'o')
+    .replace(/[ùúûü]/g, 'u').replace(/ñ/g, 'n')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60) || undefined as unknown as string;
+    .replace(/^-+|-+$/g, '');
+
+  if (slug.length <= 60) return slug;
+  const cut = slug.slice(0, 60).lastIndexOf('-');
+  return cut > 10 ? slug.slice(0, cut) : slug.slice(0, 60);
 }
 
 export async function publishToWordPress(params: {
@@ -292,9 +299,9 @@ export async function publishToWordPress(params: {
   const categoryId = CATEGORY_IDS[pillar];
   const authorId   = authorName ? AUTHOR_IDS[authorName] : undefined;
 
-  // Derive slug from the focus keyphrase (URL-safe, max 60 chars).
-  // If keyphrase is absent, WordPress auto-generates the slug from the title.
-  const slug = keyphrase ? keyphraseToSlug(keyphrase) : undefined;
+  // Derive slug from the Indonesian article title (URL-safe, max ~60 chars).
+  // Keyphrase is only used for Yoast meta fields — not the URL.
+  const slug = titleToSlug(title) || undefined;
 
   // Build Yoast SEO meta block — only included when fields are present.
   const yoastMeta = (keyphrase || metaDescription) ? {
