@@ -224,20 +224,112 @@ Respond with valid JSON only (no markdown fences):
   }
 
   /**
-   * Rewrite a draft with editor feedback, optionally using new images.
+   * Surgically revise an existing draft based on specific editor feedback.
+   *
+   * This is intentionally NOT a rewrite-from-scratch — it shows the copywriter
+   * the article it already wrote and instructs it to make the minimum change
+   * needed to fix the reported issue.  Writing from scratch on every revision
+   * caused the copywriter to "fix" one thing while silently breaking another.
+   *
+   * Falls back to writeDraft (full rewrite) only when:
+   *   - No current draft content is available (e.g. image-routing cycle reset)
+   *   - New replacement images are provided (image layout needs rethinking)
    */
   async rewrite(
-    item: ResearchedItem,
+    item:           ResearchedItem,
     editorFeedback: string,
-    newImages?: ArticleImage[]
+    newImages?:     ArticleImage[],
+    currentContent?: string          // ← current draft the editor just reviewed
   ): Promise<DraftArticle> {
-    this.log(`[Copywriter] Rewriting draft with feedback: "${item.title}"`);
+    this.log(`[Copywriter] Revision requested for: "${item.title}" — "${editorFeedback}"`);
 
-    const updatedItem: ResearchedItem = {
-      ...item,
-      images: newImages || item.images,
+    // If new images were provided, or there is no current content to work from,
+    // fall back to a full rewrite so image placement can be reconsidered.
+    if (newImages || !currentContent) {
+      const updatedItem: ResearchedItem = {
+        ...item,
+        images: newImages || item.images,
+      };
+      return this.writeDraft(updatedItem, editorFeedback);
+    }
+
+    // ── Surgical revision prompt ──────────────────────────────────────────────
+    // The copywriter sees its own article and a precise, issue-specific
+    // instruction.  It must return the FULL article with ONLY the fix applied.
+
+    const currentWordCount = currentContent.trim().split(/\s+/).filter((w) => w.length > 0).length;
+
+    const prompt = `You are making a TARGETED REVISION to an existing Bahasa Indonesia article. Your job is to apply EXACTLY ONE specific fix and return the complete corrected article.
+
+*** DO NOT REWRITE THE ARTICLE. DO NOT CHANGE ANYTHING THAT IS NOT BROKEN. ***
+
+[SPECIFIC ISSUE TO FIX]:
+${editorFeedback}
+
+[CURRENT ARTICLE — current word count: ${currentWordCount}]:
+---
+${currentContent}
+---
+
+[AVAILABLE FACTS if expansion is needed]:
+${item.facts.slice(0, 5).map((f, i) => `${i + 1}. ${f}`).join('\n')}
+
+[REVISION INSTRUCTIONS BY ISSUE TYPE]:
+
+If the issue is about WORD COUNT (below 300 words):
+  → Expand 2–3 existing sentences by adding specific detail from the facts above.
+  → Do NOT add new paragraphs or new H2 sections.
+  → Target: 300–350 words after the fix.
+
+If the issue is about a MISSING H2 SUBHEADING:
+  → Insert exactly one ## subheading before the second or third paragraph.
+  → The heading must name the specific subject of the article (not "Informasi Terbaru").
+  → Example: ## Genshin Impact 4.5 Hadirkan Karakter Sigewinne
+
+If the issue is about a MISSING OUTBOUND LINK:
+  → Find the most relevant sentence in the body and append or embed a hyperlink.
+  → Use: [baca selengkapnya di sini](${item.link})
+  → Do not add a new paragraph — weave it into existing text.
+
+If the issue is about a MISSING INTERNAL LINK:
+  → Find the most relevant sentence and embed a link to the Popshck category page.
+  → Example: [berita ${PILLAR_LABELS[item.pillar]} lainnya](${INTERNAL_CATEGORY_LINKS[item.pillar]})
+  → Do not add a new paragraph — weave it into existing text.
+
+If the issue is about IMAGE ALT TEXT:
+  → Replace any \`![featured](URL)\` or blank alt text with \`![article subject](URL)\`.
+  → The alt text must describe the specific image subject, not just the article title.
+
+[STRICT OUTPUT RULES]:
+1. Output ONLY the corrected article in Markdown. No commentary, no word count note.
+2. Keep ALL existing content that the editor did not flag.
+3. Word count must be 300–400 after your fix.
+4. The \`**Judul:**\` line and H1 headline must remain unchanged.
+5. All existing images, links, and formatting must remain intact unless you are fixing them.`;
+
+    const revised = await chat(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.4, maxTokens: 4096 }
+    );
+
+    const cleanedText  = this.stripWordCount(revised);
+    const wordCount    = this.countWords(cleanedText);
+    this.log(`[Copywriter] Revision complete. Word count: ${wordCount}`);
+
+    // Regenerate SEO metadata from the revised content
+    const { keyphrase, metaDescription } = await this.generateSeoMetadata(
+      cleanedText, item.title, item.pillar
+    );
+
+    return {
+      title:       item.title,
+      pillar:      item.pillar,
+      sourceUrl:   item.link,
+      content:     cleanedText,
+      images:      item.images,
+      wordCount,
+      keyphrase,
+      metaDescription,
     };
-
-    return this.writeDraft(updatedItem, editorFeedback);
   }
 }

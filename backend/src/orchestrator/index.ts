@@ -165,7 +165,7 @@ interface CopywriterAgent {
   readonly personaName: string;
   readonly wpAuthorId:  number;
   writeDraft(item: ResearchedItem, editorFeedback?: string): Promise<DraftArticle>;
-  rewrite(item: ResearchedItem, editorFeedback: string, newImages?: Array<{ url: string; alt: string; isFeatured: boolean; sourceQuery?: string }>): Promise<DraftArticle>;
+  rewrite(item: ResearchedItem, editorFeedback: string, newImages?: Array<{ url: string; alt: string; isFeatured: boolean; sourceQuery?: string }>, currentContent?: string): Promise<DraftArticle>;
 }
 
 // ── Orchestrator class ────────────────────────────────────────────────────────
@@ -759,7 +759,8 @@ export class Orchestrator {
           draft = await copywriter.rewrite(
             { ...item, images: currentImages },
             lastEditorFeedback,
-            currentImages
+            undefined,          // newImages — only set on IMAGE failure (handled below)
+            draft?.content      // currentContent — lets copywriter see what it wrote
           );
         }
       } catch (err) {
@@ -883,7 +884,7 @@ export class Orchestrator {
         return 'RED';
       }
 
-      // IMAGE failure → re-dispatch Researcher for new images
+      // IMAGE failure → re-dispatch Researcher for new images, then full rewrite
       if (editorResult.issueType === 'IMAGE') {
         this.addLog(
           `Image failure — re-dispatching Researcher for "${item.title}"`,
@@ -899,6 +900,9 @@ export class Orchestrator {
         } else {
           this.addLog('Researcher could not find replacement images', 'warn', 'Researcher');
         }
+        // Reset draft so next iteration does a full writeDraft with new images
+        // rather than a surgical revision that can't rearrange image placement.
+        draft = null;
       }
 
       await updateArticleState(this.prisma, articleId, {
