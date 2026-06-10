@@ -8,12 +8,21 @@
  * - Incorporate facts from the Researcher
  */
 
-import { chat } from '../services/llm';
-import type { ResearchedItem, DraftArticle, ArticleImage } from '../shared/types';
+import { chat, parseJsonResponse } from '../services/llm';
+import type { Pillar, ResearchedItem, DraftArticle, ArticleImage } from '../shared/types';
 import { PILLAR_LABELS } from '../shared/types';
 
 const MIN_WORDS = 300;
 const MAX_WORDS = 400;
+
+/** Internal link to popshck.com category pages — used for Yoast internal link SEO */
+const INTERNAL_CATEGORY_LINKS: Record<Pillar, string> = {
+  anime:         'https://popshck.com/category/anime/',
+  gaming:        'https://popshck.com/category/game/',
+  infotainment:  'https://popshck.com/category/infotainment/',
+  manga:         'https://popshck.com/category/comic/',
+  toys:          'https://popshck.com/category/toys/',
+};
 
 export class Copywriter {
   private log: (msg: string) => void;
@@ -59,6 +68,8 @@ export class Copywriter {
       ? `\n[Images]:\n${item.images.map((img, i) => `Image ${i + 1}: ${img.url}\nDescription: ${img.alt}`).join('\n')}`
       : '';
 
+    const internalLink  = INTERNAL_CATEGORY_LINKS[item.pillar];
+
     const feedbackBlock = editorFeedback
       ? `\n[Editor Notes]:\n${editorFeedback}`
       : '';
@@ -100,6 +111,13 @@ If the [Editor Notes] state that the images are broken, invalid, or flagged as "
    - Manga: *"Sudah baca chapter terbarunya? Kasih tau kita pendapat kamu!"*
    - Infotainment: *"Ikuti terus perkembangannya — ini baru permulaan."*
 
+**SEO RULES (MANDATORY — Yoast compliance):**
+6. **Focus Keyphrase in Introduction:** The very first paragraph MUST naturally contain the main subject (2–4 key words) of this article. Do not bury the topic — state it clearly in the opening sentence.
+7. **Keyphrase in Subheading:** At least one H2 (\`##\`) subheading MUST contain the article's main subject or a clear synonym. Do not write vague subheadings like "Informasi Terbaru" — make them specific to the topic.
+8. **Keyphrase in Image Alt Text:** For every image tag, write a descriptive alt text that includes the article subject. Format: \`![subject - context](URL)\`. Example: \`![Genshin Impact update 4.5 - Sigewinne character](URL)\`.
+9. **Outbound Link:** In the article body, include at least one hyperlink to the original source using natural anchor text. Example: \`[baca selengkapnya di sumber resmi](${item.link})\`.
+10. **Internal Link:** Include one internal hyperlink to the Popshck category page using natural anchor text. Example: \`[berita ${pillarLabel} lainnya](${internalLink})\`. Place it naturally within a sentence, not as a standalone line.
+
 **REVISION RULES (when [Editor Notes] are present):**
 - DO NOT add new paragraphs or new sections to fix a word count problem.
 - Instead, RESTRUCTURE and REWRITE existing sentences to be tighter or richer.
@@ -131,6 +149,15 @@ Output ONLY the article in markdown. No meta-commentary, no word count notes.`;
     const wordCount = this.countWords(cleanedText);
     this.log(`[Copywriter] Draft written. Word count: ${wordCount}`);
 
+    // Generate Yoast SEO metadata (keyphrase + meta description) in parallel with
+    // no blocking — failure here should never block article publication.
+    const { keyphrase, metaDescription } = await this.generateSeoMetadata(
+      cleanedText,
+      item.title,
+      item.pillar
+    );
+    this.log(`[Copywriter] SEO keyphrase: "${keyphrase}"`);
+
     return {
       title: item.title,
       pillar: item.pillar,
@@ -138,6 +165,58 @@ Output ONLY the article in markdown. No meta-commentary, no word count notes.`;
       content: cleanedText,
       images: item.images,
       wordCount,
+      keyphrase,
+      metaDescription,
+    };
+  }
+
+  /**
+   * Generate SEO metadata (focus keyphrase + meta description) from a finished article.
+   * Runs as a fast, cheap LLM call after the article is written — keeps the article
+   * output format clean (pure markdown) while still extracting Yoast-ready fields.
+   */
+  private async generateSeoMetadata(
+    articleContent: string,
+    title:          string,
+    pillar:         Pillar
+  ): Promise<{ keyphrase: string; metaDescription: string }> {
+    const prompt = `You are an SEO specialist for a Japanese pop-culture news portal that publishes in Bahasa Indonesia.
+
+Based on the article below, generate:
+1. A focus keyphrase: 2–4 words in Bahasa Indonesia that best represent this article's specific topic (e.g. "update Genshin Impact", "chapter terbaru One Piece", "figma Naruto baru"). Must be SPECIFIC — never generic like "berita anime".
+2. A meta description: exactly 150–160 characters in Bahasa Indonesia that naturally includes the focus keyphrase and entices readers to click.
+
+Article title: "${title}"
+Pillar: "${PILLAR_LABELS[pillar]}"
+Article excerpt:
+---
+${articleContent.slice(0, 800)}
+---
+
+Respond with valid JSON only (no markdown fences):
+{
+  "keyphrase": "2-4 word Indonesian keyphrase",
+  "metaDescription": "150-160 char Indonesian meta description"
+}`;
+
+    try {
+      const raw    = await chat([{ role: 'user', content: prompt }], { temperature: 0.3, maxTokens: 256 });
+      const result = parseJsonResponse<{ keyphrase: string; metaDescription: string }>(raw);
+      if (result.keyphrase && result.metaDescription) {
+        return {
+          keyphrase:       result.keyphrase.trim().slice(0, 60),
+          metaDescription: result.metaDescription.trim().slice(0, 160),
+        };
+      }
+    } catch (err) {
+      this.log(`[Copywriter] SEO metadata generation failed: ${(err as Error).message}`);
+    }
+
+    // Fallback: derive from title
+    const words = title.replace(/[^\w\s]/g, ' ').trim().split(/\s+/).slice(0, 4).join(' ');
+    return {
+      keyphrase:       words.toLowerCase(),
+      metaDescription: title.slice(0, 155),
     };
   }
 

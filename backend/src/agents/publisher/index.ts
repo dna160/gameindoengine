@@ -44,11 +44,13 @@ export class Publisher {
    *                      ('Satoshi' | 'Hikari' | 'Kenji' | 'Rina' | 'Taro')
    */
   async publish(params: {
-    title:       string;
-    contentHtml: string;
-    images:      ArticleImage[];
-    pillar:      Pillar;
-    authorName:  string;
+    title:            string;
+    contentHtml:      string;
+    images:           ArticleImage[];
+    pillar:           Pillar;
+    authorName:       string;
+    keyphrase?:       string;
+    metaDescription?: string;
   }): Promise<{ wpPostId: number; wpPostUrl: string }> {
     const { title, authorName, pillar } = params;
 

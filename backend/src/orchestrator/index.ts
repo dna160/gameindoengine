@@ -855,7 +855,10 @@ export class Orchestrator {
         // GREEN + YELLOW → dispatch Publisher (YELLOW = passed after revisions, still publish)
         if (status === 'GREEN' || status === 'YELLOW') {
           const publishTitle = indonesianTitle || item.title;
-          await this.tryPublish(articleId, publishTitle, finalHtml, currentImages, item.pillar, personaName);
+          await this.tryPublish(
+            articleId, publishTitle, finalHtml, currentImages, item.pillar, personaName,
+            draft?.keyphrase, draft?.metaDescription
+          );
         }
 
         return status;
@@ -909,12 +912,14 @@ export class Orchestrator {
   // ── Publisher dispatch ────────────────────────────────────────────────────────
 
   private async tryPublish(
-    articleId:   string,
-    title:       string,
-    contentHtml: string,
-    images:      Array<{ url: string; alt: string; isFeatured: boolean; sourceQuery?: string }>,
-    pillar:      Pillar,
-    authorName:  string
+    articleId:        string,
+    title:            string,
+    contentHtml:      string,
+    images:           Array<{ url: string; alt: string; isFeatured: boolean; sourceQuery?: string }>,
+    pillar:           Pillar,
+    authorName:       string,
+    keyphrase?:       string,
+    metaDescription?: string
   ): Promise<void> {
     if (!process.env.WP_BASE_URL && !process.env.WP_URL) {
       this.addLog('WordPress not configured — skipping auto-publish', 'info', ORCHESTRATOR_IDENTITY);
@@ -925,7 +930,7 @@ export class Orchestrator {
 
     try {
       const { wpPostId, wpPostUrl } = await this.publisher.publish({
-        title, contentHtml, images, pillar, authorName,
+        title, contentHtml, images, pillar, authorName, keyphrase, metaDescription,
       });
       await updateArticleState(this.prisma, articleId, {
         status: 'PUBLISHED', wpPostId, wpPostUrl,

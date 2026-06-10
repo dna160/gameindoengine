@@ -93,6 +93,10 @@ export interface DraftArticle {
   content: string;
   images: ArticleImage[];
   wordCount: number;
+  /** 2–4 word Indonesian focus keyphrase for Yoast SEO */
+  keyphrase?: string;
+  /** 150–160 char Indonesian meta description containing the keyphrase */
+  metaDescription?: string;
 }
 
 export interface EditorResult {

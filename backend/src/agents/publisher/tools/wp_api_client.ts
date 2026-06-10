@@ -41,6 +41,11 @@ export interface WpPostPayload {
   categories?:     number[];
   featured_media?: number;
   author?:         number;
+  slug?:           string;
+  meta?:           {
+    _yoast_wpseo_focuskw?:  string;   // Yoast focus keyphrase
+    _yoast_wpseo_metadesc?: string;   // Yoast meta description
+  };
 }
 
 export interface WpPostResponse {
@@ -242,14 +247,27 @@ export async function createPost(payload: WpPostPayload): Promise<WpPostResponse
  * Full publish flow: upload images, replace URLs in HTML, create post.
  * Returns WP post ID and live URL.
  */
+/** Convert a keyphrase to a URL-safe WordPress slug */
+function keyphraseToSlug(keyphrase: string): string {
+  return keyphrase
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')   // strip non-ASCII (Indonesian chars, symbols)
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || undefined as unknown as string;
+}
+
 export async function publishToWordPress(params: {
-  title:       string;
-  contentHtml: string;
-  images:      ArticleImage[];
-  pillar:      Pillar;
-  authorName?: string;  // persona name → mapped to WP user ID
+  title:           string;
+  contentHtml:     string;
+  images:          ArticleImage[];
+  pillar:          Pillar;
+  authorName?:     string;   // persona name → mapped to WP user ID
+  keyphrase?:      string;   // Yoast focus keyphrase
+  metaDescription?: string;  // Yoast meta description
 }): Promise<{ wpPostId: number; wpPostUrl: string }> {
-  const { title, images, pillar, authorName } = params;
+  const { title, images, pillar, authorName, keyphrase, metaDescription } = params;
 
   let featuredMediaId: number | undefined;
 
@@ -274,6 +292,16 @@ export async function publishToWordPress(params: {
   const categoryId = CATEGORY_IDS[pillar];
   const authorId   = authorName ? AUTHOR_IDS[authorName] : undefined;
 
+  // Derive slug from the focus keyphrase (URL-safe, max 60 chars).
+  // If keyphrase is absent, WordPress auto-generates the slug from the title.
+  const slug = keyphrase ? keyphraseToSlug(keyphrase) : undefined;
+
+  // Build Yoast SEO meta block — only included when fields are present.
+  const yoastMeta = (keyphrase || metaDescription) ? {
+    ...(keyphrase      ? { _yoast_wpseo_focuskw:  keyphrase }      : {}),
+    ...(metaDescription ? { _yoast_wpseo_metadesc: metaDescription } : {}),
+  } : undefined;
+
   // featured_media is placed BEFORE content intentionally.
   // content can be 20–50 KB of HTML; WAFs that parse request bodies up to a
   // size limit will drop everything after the large content field.
@@ -282,7 +310,9 @@ export async function publishToWordPress(params: {
     title,
     featured_media:  featuredMediaId,
     categories:      [categoryId],
-    ...(authorId !== undefined ? { author: authorId } : {}),
+    ...(authorId    !== undefined ? { author: authorId } : {}),
+    ...(slug        !== undefined ? { slug }             : {}),
+    ...(yoastMeta   !== undefined ? { meta: yoastMeta }  : {}),
     status:          'publish',
     content:         finalHtml,
   });
