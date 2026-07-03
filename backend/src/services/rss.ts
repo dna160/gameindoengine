@@ -119,6 +119,16 @@ export const PRIORITY_FEEDS: FeedConfig[] = [
     confidence: 'high',
   },
 
+  // Figsoku (fig速) — dedicated Japanese figure/toy news aggregator.
+  // Covers Nendoroids, figma, Revoltech, scale figures (Beautiful Girls,
+  // Robot Spirits, S.H.Figuarts), Gunpla, gashapon, capsule toys, and
+  // prize figures. 100% toys content — added as priority toys source.
+  {
+    url:        'https://figsoku.net/feed',
+    tags:       ['toys'],
+    confidence: 'unverified',
+  },
+
   // Essential Japan — 34 items: gaming 56%, anime 35%, manga 9%.
   // ⚠️ HISTORICAL TAG WAS WRONG: previously tagged ['infotainment'] but
   // memory shows ZERO infotainment classifications. Retagged to actual output.
@@ -255,7 +265,8 @@ export const RSS_FEEDS: Record<Pillar, string[]> = {
     'https://news.denfaminicogamer.jp/feed',                              // Denfami — manga 7%
   ],
   toys: [
-    'https://hobby.dengeki.com/feed/',                                    // Dengeki Hobby — toys 82% (best toys source)
+    'https://figsoku.net/feed',                                           // Figsoku — 100% toys: Nendoroids, figma, scale figures, Gunpla, gashapon (PRIORITY)
+    'https://hobby.dengeki.com/feed/',                                    // Dengeki Hobby — toys 82% (best proven source)
     'https://www.4gamer.net/rss/index.xml',                              // 4Gamer — toys 5% (game merch)
     'https://news.denfaminicogamer.jp/feed',                              // Denfami — toys 11%
     'https://rss-mstdn.studiofreesia.com/@animeanime.rss',               // animeanime.jp via proxy — figure crossovers
