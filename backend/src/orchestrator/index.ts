@@ -78,6 +78,22 @@ const MAX_SOCIAL_POSTS_PER_PILLAR = 10;
 const MAX_SCOUT_EMPTY_ROUNDS = 5;
 
 /**
+ * The Social Media Coordinator pipeline is stubbed out until at least one
+ * platform's API credentials are configured. This keeps the feature (agents,
+ * orchestrator, publisher) intact in the codebase while excluding it from
+ * the live pipeline — no social content is produced until real credentials
+ * are set, at which point this check flips on automatically.
+ */
+function isSocialMediaConfigured(): boolean {
+  return Boolean(
+    (process.env.IG_ACCESS_TOKEN && process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID) ||
+    process.env.FACEBOOK_PAGE_ID ||
+    (process.env.X_CONSUMER_KEY && process.env.X_CONSUMER_KEY_SECRET &&
+     process.env.X_ACCESS_TOKEN && process.env.X_ACCESS_SECRET)
+  );
+}
+
+/**
  * Jaccard title-similarity threshold above which two articles are treated
  * as covering the same topic.  0.40 means ~40% meaningful token overlap.
  *
@@ -946,6 +962,14 @@ export class Orchestrator {
       );
 
       // ── Social Media Coordinator ──────────────────────────────────────────────
+      if (!isSocialMediaConfigured()) {
+        this.addLog(
+          '[Social] Social media APIs not configured — pipeline stubbed, skipping social post',
+          'info',
+          ORCHESTRATOR_IDENTITY
+        );
+        return;
+      }
       const socialCount = this.socialPostCountByPillar.get(pillar) ?? 0;
       this.addLog(
         `[Social] Check for "${title}": count=${socialCount}/${MAX_SOCIAL_POSTS_PER_PILLAR} pillar=${pillar} images=${images.length} wpPostUrl=${wpPostUrl}`,
