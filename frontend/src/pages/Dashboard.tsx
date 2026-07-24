@@ -69,11 +69,11 @@ export const Dashboard: React.FC = () => {
       published:  articles.filter((a) => a.status === 'PUBLISHED').length,
       failed:     articles.filter((a) => a.status === 'FAILED').length,
       byPillar: {
-        anime:        articles.filter((a) => a.pillar === 'anime').length,
-        gaming:       articles.filter((a) => a.pillar === 'gaming').length,
-        infotainment: articles.filter((a) => a.pillar === 'infotainment').length,
-        manga:        articles.filter((a) => a.pillar === 'manga').length,
-        toys:         articles.filter((a) => a.pillar === 'toys').length,
+        esports:       articles.filter((a) => a.pillar === 'esports').length,
+        videogame:     articles.filter((a) => a.pillar === 'videogame').length,
+        entertainment: articles.filter((a) => a.pillar === 'entertainment').length,
+        tech:          articles.filter((a) => a.pillar === 'tech').length,
+        streamer:      articles.filter((a) => a.pillar === 'streamer').length,
       },
     };
   }, [articles]);

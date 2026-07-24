@@ -48,178 +48,50 @@ export interface FeedConfig {
 /**
  * ── Tier 2: Preferred — General Feeds (Round 1 / Broad Scrape) ───────────────
  *
- * Fetched on every Round 1 dispatch. Mixed-topic, high-volume Japanese
- * pop-culture feeds. The Scout's LLM triage categorises each item into the
- * correct pillar. These feeds organically cover all 5 pillars but are not
- * specialised — they are the starting "broad net".
+ * Fetched on every Round 1 dispatch. Mixed-topic, high-volume feeds. The
+ * Scout's LLM triage categorises each item into the correct pillar
+ * (esports | videogame | entertainment | tech | streamer).
  *
  * ── Tier 1: Priority — Subpillar-Specific Feeds (Underquota Protocol) ─────────
  *
- * Entries with a single specific tag (e.g. tags: ['manga']) are subpillar
+ * Entries with a single specific tag (e.g. tags: ['esports']) are subpillar
  * branches. The Underquota Protocol filters this list by tag to build a
  * targeted pool for exactly the deficit pillar(s).
  *
- * e.g. natalie.mu/comic → tagged ['manga'] → activated when manga is underquota
+ * Fresh gameindo.com sources (live-verified at supply time). Confidence is a
+ * best-effort SEED based on observed per-fetch volume/reliability — FeedMemory
+ * recalibrates it from real output over time.
  */
 export const PRIORITY_FEEDS: FeedConfig[] = [
-  // ─────────────────────────────────────────────────────────────────────────
-  //   HIGH CONFIDENCE — Japanese RSS sources with proven historical output.
-  //   Tags reflect ACTUAL pillar distribution in FeedMemory, NOT the
-  //   publication's stated coverage. Sorted by total historical volume.
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Esports / Video Game ────────────────────────────────────────────────────
+  // 4Gamer — Japanese gaming, highest volume (~100 items/fetch).
+  { url: 'https://www.4gamer.net/rss/index.xml',      tags: ['videogame', 'esports'],                             confidence: 'high' },
+  // Dexerto — esports, streamers/influencers, gaming & pop-culture. Workhorse
+  // for the thin streamer/entertainment pillars (broad tag → LLM triage sorts).
+  { url: 'https://www.dexerto.com/feed/',             tags: ['esports', 'streamer', 'videogame', 'entertainment'], confidence: 'high' },
+  // Dot Esports — esports news + game guides.
+  { url: 'https://dotesports.com/feed',               tags: ['esports', 'videogame', 'streamer'],                 confidence: 'medium' },
+  // ESTNN — dedicated esports news.
+  { url: 'https://estnn.com/feed/',                   tags: ['esports'],                                          confidence: 'medium' },
+  // Ruliweb (news) — Korean gaming community news.
+  { url: 'https://bbs.ruliweb.com/news/rss',          tags: ['videogame', 'esports'],                             confidence: 'medium' },
+  // DenFamiNiCoGamer — Japanese gaming, diverse (games + pop culture).
+  { url: 'https://news.denfaminicogamer.jp/feed',     tags: ['videogame', 'entertainment'],                       confidence: 'high' },
 
-  // ANN — 747 items: anime 69%, manga 16%, gaming 12%, toys 2%, info 1%.
-  // English-language but covers Japanese content end-to-end. Single most
-  // productive source overall.
-  {
-    url: 'https://www.animenewsnetwork.com/all/rss.xml?ann-edition=us',
-    tags: ['anime', 'manga', 'gaming', 'toys'],
-    confidence: 'high',
-  },
+  // ── Tech ────────────────────────────────────────────────────────────────────
+  { url: 'https://techcrunch.com/feed/',              tags: ['tech'],                                             confidence: 'high' },
+  { url: 'https://www.wired.com/feed/rss',            tags: ['tech'],                                             confidence: 'high' },
+  { url: 'https://www.theverge.com/rss/index.xml',    tags: ['tech'],                                             confidence: 'medium' },
 
-  // 4Gamer — 227 items: gaming 92%, toys 5%, anime 3%. Pure gaming with
-  // occasional figure/merch reviews tagged toys.
-  {
-    url:        'https://www.4gamer.net/rss/index.xml',
-    tags:       ['gaming', 'toys'],
-    confidence: 'high',
-  },
+  // ── Mastodon native feeds — TEMPLATES ONLY (add a concrete handle/tag) ───────
+  // Append @<username>.rss to a profile, or /tags/<tag>.rss to a hashtag:
+  // { url: 'https://chaosphere.hostdon.jp/@<username>.rss',       tags: ['videogame'], confidence: 'unverified' },
+  // { url: 'https://rss-mstdn.studiofreesia.com/@<username>.rss', tags: ['videogame'], confidence: 'unverified' },
 
-  // Denfaminicogamer — 212 items: gaming 64%, anime 13%, toys 11%, manga 7%,
-  // info 5%. The most pillar-diverse source we have.
-  {
-    url:        'https://news.denfaminicogamer.jp/feed',
-    tags:       ['gaming', 'anime', 'toys', 'manga', 'infotainment'],
-    confidence: 'high',
-  },
-
-  // Automaton — 115 items: gaming 100%. Pure gaming despite formerly being
-  // tagged for anime/manga; the LLM never classifies its output as those.
-  {
-    url:        'https://automaton-media.com/feed/',
-    tags:       ['gaming'],
-    confidence: 'high',
-  },
-
-  // Chaosphere (Natalie Mastodon proxy) — 71 items: manga 65%, anime 30%,
-  // info 4%, toys 1%. Aggregates natalie.mu's manga/anime verticals via
-  // Mastodon since the direct natalie.mu/comic|anime feeds don't surface
-  // any items in our memory.
-  {
-    url:        'https://chaosphere.hostdon.jp/@natalie.rss',
-    tags:       ['manga', 'anime', 'infotainment'],
-    confidence: 'high',
-  },
-
-  // Dengeki Hobby — 44 items: toys 82%, manga 9%, gaming 5%, anime 2%,
-  // info 2%. Reliable toys/figures source. Dropped 'anime' tag (only 1 item).
-  {
-    url:        'https://hobby.dengeki.com/feed/',
-    tags:       ['toys', 'manga'],
-    confidence: 'high',
-  },
-
-  // Figsoku (fig速) — dedicated Japanese figure/toy news aggregator.
-  // Covers Nendoroids, figma, Revoltech, scale figures (Beautiful Girls,
-  // Robot Spirits, S.H.Figuarts), Gunpla, gashapon, capsule toys, and
-  // prize figures. 100% toys content — added as priority toys source.
-  {
-    url:        'https://figsoku.net/feed',
-    tags:       ['toys'],
-    confidence: 'unverified',
-  },
-
-  // Essential Japan — 34 items: gaming 56%, anime 35%, manga 9%.
-  // ⚠️ HISTORICAL TAG WAS WRONG: previously tagged ['infotainment'] but
-  // memory shows ZERO infotainment classifications. Retagged to actual output.
-  {
-    url:        'https://essential-japan.com/feed/',
-    tags:       ['gaming', 'anime', 'manga'],
-    confidence: 'medium',
-  },
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //   ANIMECORNER — https://animecorner.me
-  //
-  //   Confirmed exclusive anime source.  feed-memory.json records 86 anime
-  //   items, 10 gaming, 9 manga (105 total across prior runs).  Uses its own
-  //   WordPress-hosted RSS feed — content is entirely distinct from ANN and
-  //   Mastodon proxies, so it provides a genuinely fresh pool of articles
-  //   even when ANN is exhausted by a prior run within the same 8-hour window.
-  //   Classified as 'medium' confidence (proven output, not yet at 'high'
-  //   threshold of ≥30 consistent items per pillar per run).
-  // ─────────────────────────────────────────────────────────────────────────
-  {
-    url:        'https://animecorner.me/feed/',
-    tags:       ['anime', 'manga'],
-    confidence: 'medium',
-  },
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //   MASTODON PROXIES — Japanese publication aggregators served via
-  //   rss-mstdn.studiofreesia.com.  These URLs were ALREADY in the codebase
-  //   as fallbacks for the now-dead natalie.mu/* and oricon.co.jp/* primary
-  //   URLs (every primary returned 404/403/410 in the live diagnostic).
-  //   Promoting them to primaries makes the config honest — the system was
-  //   already silently using these every run.
-  //
-  //   Each proxy aggregates a DIFFERENT Japanese publication:
-  //     @animeanime — animeanime.jp (anime news + glossy/figure crossovers)
-  //     @gamespark  — gamespark.jp  (gaming news, JP indie & gacha coverage)
-  //     @oricon_news — oricon.co.jp (J-pop, idols, drama, films, charts)
-  //
-  //   They have 0 entries in feed-memory.json because past pipeline runs
-  //   either couldn't reach them or attributed items elsewhere.  Marked
-  //   'unverified' until first run produces measurable LLM-approved output.
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // Anime — animeanime.jp aggregator.  Returns 20 items per fetch with
-  // current pubDates.  Anime news, voice-actor coverage, figure/glossy crossovers.
-  {
-    url:        'https://rss-mstdn.studiofreesia.com/@animeanime.rss',
-    tags:       ['anime', 'toys'],
-    confidence: 'unverified',
-  },
-
-  // Gaming — gamespark.jp aggregator.  Returns 20 items per fetch.  Western
-  // gaming + JP gacha/MMO coverage.  Gaming bucket usually doesn't need help,
-  // but kept for completeness.
-  {
-    url:        'https://rss-mstdn.studiofreesia.com/@gamespark.rss',
-    tags:       ['gaming'],
-    confidence: 'unverified',
-  },
-
-  // Infotainment — oricon.co.jp aggregator.  THE primary structural answer
-  // for the infotainment pillar.  All 4 dead oricon.co.jp/rss/* entries used
-  // to fall back to this same URL (massive redundancy — fetched the same 20
-  // items 4× per run).  Now consolidated into one entry.
-  {
-    url:        'https://rss-mstdn.studiofreesia.com/@oricon_news.rss',
-    tags:       ['infotainment'],
-    confidence: 'unverified',
-  },
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //   REMOVED FEEDS (logged here for archeology — see commit history):
-  //
-  //   • natalie.mu/comic/feed  — primary 404, fallback redundant with
-  //                              chaosphere (which already aggregates
-  //                              natalie.mu/comic content)
-  //   • natalie.mu/anime/feed  — primary 404, fallback promoted above
-  //   • natalie.mu/game/feed   — primary 404, fallback promoted above
-  //   • natalie.mu/music/feed  — primary 404, fallback promoted above
-  //   • oricon.co.jp/rss/news/    — primary 403, fallback consolidated above
-  //   • oricon.co.jp/rss/music/   — primary 410 GONE, fallback consolidated
-  //   • oricon.co.jp/rss/movie/   — primary 410 GONE, fallback consolidated
-  //   • oricon.co.jp/rss/special/ — primary 410 GONE, fallback consolidated
-  //   • feeds.feedburner.com/tokyohive — broken XML (unescaped & at line 70),
-  //                                       no fallback, parser fails outright
-  //   • amiami.com/eng/rss/newitem.xml — primary 403, fallback was
-  //                                       hobby.dengeki.com (already a primary)
-  //   • toy-people.com/rss.php — primary 404, fallback was hobby.dengeki.com
-  //                              (already a primary, pure redundancy)
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Excluded — unreachable at supply time (re-add if the source is fixed) ────
+  //   • ONE Esports  https://www.oneesports.gg/feed/  → redirects to HTML, no RSS
+  //   • GGWP.ID      https://ggwp.id/feed/            → 404
+  //   • Famitsu      https://rsshub.app/famitsu/...   → 403 (public RSSHub blocked)
 ];
 
 /**
@@ -237,39 +109,37 @@ export const PRIORITY_FEEDS: FeedConfig[] = [
  * Tier 3 (fallback_protocol) re-uses these same feeds but sweeps ALL pillars,
  * sorted by FeedMemory score, when both Round 1 and Underquota have failed.
  *
- * Feed sources match the README Content Pillars table (source of truth).
+ * Per-pillar targeted lists for the Underquota Protocol. Only feeds likely to
+ * yield the deficit pillar are listed; the Scout's LLM triage still filters
+ * each item strictly to the target pillar.
  */
 export const RSS_FEEDS: Record<Pillar, string[]> = {
-  anime: [
-    'https://www.animenewsnetwork.com/all/rss.xml?ann-edition=us',       // ANN — anime 69% (primary)
-    'https://animecorner.me/feed/',                                       // AnimeCorner — 86 anime items in history; EXCLUSIVE (not in PRIORITY_FEEDS before v2)
-    'https://chaosphere.hostdon.jp/@natalie.rss',                        // Natalie via Mastodon proxy — manga 65%, anime 30%
-    'https://rss-mstdn.studiofreesia.com/@animeanime.rss',               // animeanime.jp via Mastodon proxy
+  esports: [
+    'https://dotesports.com/feed',               // Dot Esports — esports news
+    'https://estnn.com/feed/',                   // ESTNN — dedicated esports
+    'https://www.dexerto.com/feed/',             // Dexerto — esports + scene
+    'https://www.4gamer.net/rss/index.xml',      // 4Gamer — JP competitive/gaming
+    'https://bbs.ruliweb.com/news/rss',          // Ruliweb — KR gaming/esports
   ],
-  gaming: [
-    'https://www.4gamer.net/rss/index.xml',                              // 4Gamer — gaming 92%
-    'https://automaton-media.com/feed/',                                  // Automaton — gaming 100%
-    'https://news.denfaminicogamer.jp/feed',                              // Denfami — gaming 64% (most diverse)
-    'https://rss-mstdn.studiofreesia.com/@gamespark.rss',                 // gamespark.jp via Mastodon proxy
+  videogame: [
+    'https://www.4gamer.net/rss/index.xml',      // 4Gamer — JP gaming (high volume)
+    'https://news.denfaminicogamer.jp/feed',     // DenFami — JP gaming, diverse
+    'https://bbs.ruliweb.com/news/rss',          // Ruliweb — KR gaming
+    'https://dotesports.com/feed',               // Dot Esports — game news/guides
+    'https://www.dexerto.com/feed/',             // Dexerto — gaming
   ],
-  infotainment: [
-    'https://rss-mstdn.studiofreesia.com/@oricon_news.rss',               // oricon.co.jp via Mastodon proxy — primary infotainment source
-    'https://news.denfaminicogamer.jp/feed',                              // Denfami — info 5% (still measurable)
-    'https://chaosphere.hostdon.jp/@natalie.rss',                        // Natalie — info 4%
+  entertainment: [
+    'https://www.dexerto.com/feed/',             // Dexerto — pop-culture/entertainment vertical
+    'https://news.denfaminicogamer.jp/feed',     // DenFami — JP pop culture crossovers
   ],
-  manga: [
-    'https://chaosphere.hostdon.jp/@natalie.rss',                        // Natalie — manga 65% (best manga source)
-    'https://www.animenewsnetwork.com/all/rss.xml?ann-edition=us',       // ANN — manga 16%
-    'https://animecorner.me/feed/',                                       // AnimeCorner — 9 manga items in history; EXCLUSIVE source
-    'https://hobby.dengeki.com/feed/',                                    // Dengeki Hobby — manga 9%
-    'https://news.denfaminicogamer.jp/feed',                              // Denfami — manga 7%
+  tech: [
+    'https://techcrunch.com/feed/',              // TechCrunch — tech/startups
+    'https://www.wired.com/feed/rss',            // WIRED — tech/culture
+    'https://www.theverge.com/rss/index.xml',    // The Verge — consumer tech/gadgets
   ],
-  toys: [
-    'https://figsoku.net/feed',                                           // Figsoku — 100% toys: Nendoroids, figma, scale figures, Gunpla, gashapon (PRIORITY)
-    'https://hobby.dengeki.com/feed/',                                    // Dengeki Hobby — toys 82% (best proven source)
-    'https://www.4gamer.net/rss/index.xml',                              // 4Gamer — toys 5% (game merch)
-    'https://news.denfaminicogamer.jp/feed',                              // Denfami — toys 11%
-    'https://rss-mstdn.studiofreesia.com/@animeanime.rss',               // animeanime.jp via proxy — figure crossovers
+  streamer: [
+    'https://www.dexerto.com/feed/',             // Dexerto — streamer/influencer news (primary)
+    'https://dotesports.com/feed',               // Dot Esports — creator/streamer coverage
   ],
 };
 
@@ -403,7 +273,7 @@ export async function fetchPillarFeeds(pillar: Pillar): Promise<RssItem[]> {
  * Fetch all feeds for all pillars in parallel.
  */
 export async function fetchAllFeeds(): Promise<Record<Pillar, RssItem[]>> {
-  const pillars: Pillar[] = ['anime', 'gaming', 'infotainment', 'manga', 'toys'];
+  const pillars: Pillar[] = ['esports', 'videogame', 'entertainment', 'tech', 'streamer'];
 
   const results = await Promise.allSettled(
     pillars.map((p) => fetchPillarFeeds(p).then((items) => ({ pillar: p, items })))

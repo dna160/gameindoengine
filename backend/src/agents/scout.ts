@@ -125,7 +125,7 @@ export interface ScoutPayload {
   mode: 'round_1' | 'underquota_protocol' | 'fallback_protocol';
   /**
    * Human-readable pillar labels that are still below quota, e.g.
-   * ['Japanese Manga', 'Japanese Toys/Collectibles'].
+   * ['Esports', 'Teknologi'].
    * Required for underquota_protocol and fallback_protocol.
    */
   missing_pillars?: string[];
@@ -133,33 +133,36 @@ export interface ScoutPayload {
 
 // ── Pillar label alias map ────────────────────────────────────────────────────
 const PILLAR_FROM_LABEL: Record<string, Pillar> = {
-  'Japanese Anime':             'anime',
-  'Japanese Gaming':            'gaming',
-  'Japanese Infotainment':      'infotainment',
-  'Japanese Manga':             'manga',
-  'Japanese Toys/Collectibles': 'toys',
-  'Anime':                      'anime',
-  'anime':                      'anime',
-  'Gaming':                     'gaming',
-  'gaming':                     'gaming',
-  'Game':                       'gaming',
-  'Japanese Game':              'gaming',
-  'Japanese Games':             'gaming',
-  'Infotainment':               'infotainment',
-  'infotainment':               'infotainment',
-  'Japanese Entertainment':     'infotainment',
-  'Entertainment':              'infotainment',
-  'Japanese Pop Culture':       'infotainment',
-  'Manga':                      'manga',
-  'manga':                      'manga',
-  'Japanese Comic':             'manga',
-  'Comics':                     'manga',
-  'Toys':                       'toys',
-  'toys':                       'toys',
-  'Collectibles':               'toys',
-  'Toys/Collectibles':          'toys',
-  'Japanese Toys':              'toys',
-  'Japanese Collectibles':      'toys',
+  'Esports':            'esports',
+  'esports':            'esports',
+  'E-sports':          'esports',
+  'Competitive Gaming': 'esports',
+  'Pro Gaming':         'esports',
+  'Tournament':         'esports',
+  'Video Game':         'videogame',
+  'videogame':          'videogame',
+  'Video Games':        'videogame',
+  'Gaming':             'videogame',
+  'Game':               'videogame',
+  'Games':              'videogame',
+  'Entertainment':      'entertainment',
+  'entertainment':      'entertainment',
+  'Hiburan':            'entertainment',
+  'Pop Culture':        'entertainment',
+  'Movies':             'entertainment',
+  'Music':              'entertainment',
+  'Tech':               'tech',
+  'tech':               'tech',
+  'Technology':         'tech',
+  'Teknologi':          'tech',
+  'Gadget':             'tech',
+  'Gadgets':            'tech',
+  'Streamer':           'streamer',
+  'streamer':           'streamer',
+  'Streaming':          'streamer',
+  'Live Content':       'streamer',
+  'Content Creator':    'streamer',
+  'Creator':            'streamer',
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -229,7 +232,7 @@ function fairPillarInterleave(items: PoolItem[], memory: FeedMemory): PoolItem[]
   }
 
   // ── Step 2: Group sources into pillar lanes by their dominant history ────
-  // Lane keys are 'anime' | 'gaming' | 'infotainment' | 'manga' | 'toys' | 'unknown'.
+  // Lane keys are 'esports' | 'videogame' | 'entertainment' | 'tech' | 'streamer' | 'unknown'.
   // Sources with no history land in 'unknown' (treated as last-priority).
   type LaneKey = Pillar | 'unknown';
   const lanes = new Map<LaneKey, string[]>();
@@ -257,10 +260,10 @@ function fairPillarInterleave(items: PoolItem[], memory: FeedMemory): PoolItem[]
 
   // ── Step 3: Lane draw priority — rarest pillar first ─────────────────────
   // Order matters: lanes drawn first get higher pool-head placement.
-  // Toys, manga, infotainment historically yield FEWEST candidates so they
-  // get first dibs on the pool head. 'unknown' goes last so untrained feeds
-  // don't crowd out feeds we know are useful for scarce pillars.
-  const lanePriority: LaneKey[] = ['toys', 'infotainment', 'manga', 'anime', 'gaming', 'unknown'];
+  // Niche pillars (esports, tech, streamer) tend to yield FEWEST candidates so
+  // they get first dibs on the pool head. 'unknown' goes last so untrained
+  // feeds don't crowd out feeds we know are useful for scarce pillars.
+  const lanePriority: LaneKey[] = ['esports', 'tech', 'streamer', 'entertainment', 'videogame', 'unknown'];
 
   // ── Step 4: Round-robin draw across lanes, then sources within lane ──────
   const result: PoolItem[] = [];
@@ -297,7 +300,7 @@ function fairPillarInterleave(items: PoolItem[], memory: FeedMemory): PoolItem[]
 }
 
 function emptyPillarCounts(): PillarCounts {
-  return { anime: 0, gaming: 0, infotainment: 0, manga: 0, toys: 0 };
+  return { esports: 0, videogame: 0, entertainment: 0, tech: 0, streamer: 0 };
 }
 
 // ── Empirical Feed Memory ─────────────────────────────────────────────────────
@@ -522,28 +525,27 @@ export class Scout {
   // ── LLM triage ───────────────────────────────────────────────────────────────
 
   private async triageItem(title: string, summary: string): Promise<TriageResult> {
-    const prompt = `You are the **Scout Agent** for a Japanese pop-culture newsroom. Your job is to analyze raw Japanese RSS feed items, extract the core facts, and provide accurate localization notes.
+    const prompt = `You are the **Scout Agent** for a pop-culture, gaming & tech newsroom. Your job is to analyze raw RSS feed items, extract the core facts, and provide accurate localization notes.
 
 **INSTRUCTIONS:**
-1. **Dynamic Categorization:** Read the raw RSS content and classify it into EXACTLY ONE of the following 5 pillars:
-   - **Japanese Anime** — TV anime, anime films, OVAs, voice actors (seiyuu),
-     anime studios, anime-original projects.
-   - **Japanese Gaming** — video games (console/PC/mobile/arcade), game
-     announcements, beta tests, esports, JRPGs, gacha, indie JP titles.
-   - **Japanese Infotainment** — J-pop / K-pop in Japan, idol groups
-     (AKB48, Sakurazaka46, Hello!Project, Johnny's), Oricon music charts,
-     live concerts, J-drama, Japanese live-action films, variety shows,
-     celebrity news, music video releases. NOT anime films — those go to Anime.
-   - **Japanese Manga** — manga series (Shonen Jump, Magazine Pocket, etc.),
-     manga authors, comic awards, manga-original projects, light novels.
-   - **Japanese Toys/Collectibles** — figures (PVC/scale/Nendoroid),
-     plamo/gunpla, prize figures, trading cards, gachapon, hobby merch,
-     pre-order announcements, collectible toy news.
+1. **Dynamic Categorization:** Read the raw RSS content and classify it into EXACTLY ONE of the following 5 pillars (use the exact label in the "pillar" field):
+   - **Esports** — competitive gaming, tournaments, pro players & teams,
+     roster moves, prize pools, match results, MOBA / FPS / battle-royale
+     competitive scene (MLBB, Valorant, Dota 2, PUBGM, etc.).
+   - **Video Game** — video game news, releases, launches, reviews, patches/
+     updates, trailers, single-player / AAA / indie titles, console/PC/mobile
+     gaming (NON-competitive coverage).
+   - **Entertainment** — movies, TV & streaming series, music, celebrities,
+     concerts, awards, pop culture, film/show announcements.
+   - **Teknologi** — gadgets, smartphones, PCs, hardware, consumer electronics,
+     software, apps, AI, and tech-company news.
+   - **Streamer** — live streaming & content creators, Twitch/YouTube/TikTok
+     live, streamer news & drama, the creator economy, VTubers.
    *(If the article does not fit any of these, mark it as "REJECTED".)*
 
 2. **Fact Extraction:** Extract the who, what, when, where, and why of the news.
 
-3. **CRITICAL LOCALIZATION RULE:** Do NOT use literal translations for Japanese proper nouns (character names, game titles, anime titles, studio names). You must research or infer their official English localized names or standard Romaji.
+3. **CRITICAL LOCALIZATION RULE:** Do NOT use literal translations for foreign proper nouns (character names, game titles, studio names, personalities). You must research or infer their official English localized names or standard Romaji.
    - *Example:* Do not translate [ネル ～コールサインダブルオー～] literally. Research it and provide the proper name: "Neru".
 
 4. **Output Format:** Provide a section called \`[Translation Notes]\` explicitly listing the correct Romaji/English names for all key entities found in the article.
@@ -630,7 +632,8 @@ Respond ONLY with the JSON object.`;
   ): Promise<PoolItem[]> {
     // ── Step 1: Fetch all feeds concurrently (with per-feed fallback) ─────────
     const feedResults = await Promise.allSettled(
-      feedUrls.map((url) => fetchFeed(url, 'anime', FEED_FALLBACK_MAP.get(url)))
+      // Placeholder pillar — the real pillar is assigned later by LLM triage.
+      feedUrls.map((url) => fetchFeed(url, 'videogame', FEED_FALLBACK_MAP.get(url)))
     );
 
     // ── Step 2: Collect and deduplicate raw items ─────────────────────────────
@@ -815,7 +818,7 @@ Respond ONLY with the JSON object.`;
    */
   private buildScoringBuckets(missingSet: Set<Pillar>): Record<Pillar, ScoutItem[]> {
     const buckets: Record<Pillar, ScoutItem[]> = {
-      anime: [], gaming: [], infotainment: [], manga: [], toys: [],
+      esports: [], videogame: [], entertainment: [], tech: [], streamer: [],
     };
     for (const pillar of PILLARS) {
       if (!missingSet.has(pillar)) {
@@ -875,11 +878,11 @@ Respond ONLY with the JSON object.`;
 
     // Deep-copy scoringBuckets so we can mutate locally without polluting the caller.
     const localBuckets: Record<Pillar, ScoutItem[]> = {
-      anime:        [...scoringBuckets.anime],
-      gaming:       [...scoringBuckets.gaming],
-      infotainment: [...scoringBuckets.infotainment],
-      manga:        [...scoringBuckets.manga],
-      toys:         [...scoringBuckets.toys],
+      esports:       [...scoringBuckets.esports],
+      videogame:     [...scoringBuckets.videogame],
+      entertainment: [...scoringBuckets.entertainment],
+      tech:          [...scoringBuckets.tech],
+      streamer:      [...scoringBuckets.streamer],
     };
 
     /** Active pillars = the ones we're still trying to fill. */
@@ -1193,7 +1196,7 @@ Respond ONLY with the JSON object.`;
     let scoringBuckets: Record<Pillar, ScoutItem[]>;
     if (mode === 'round_1') {
       // All pillars equally needed — empty buckets → score driven purely by history
-      scoringBuckets = { anime: [], gaming: [], infotainment: [], manga: [], toys: [] };
+      scoringBuckets = { esports: [], videogame: [], entertainment: [], tech: [], streamer: [] };
     } else {
       const missingSet = new Set(
         missing_pillars

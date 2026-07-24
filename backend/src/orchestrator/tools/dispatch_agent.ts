@@ -16,30 +16,30 @@ import type { Pillar } from '../../shared/types';
 export type AgentHandle =
   | 'scout'
   | 'researcher'
-  | 'copywriters/anime_satoshi'
-  | 'copywriters/gaming_hikari'
-  | 'copywriters/infotainment_kenji'
-  | 'copywriters/manga_rina'
-  | 'copywriters/toys_taro'
+  | 'copywriters/esports_gani'
+  | 'copywriters/videogame_valentino'
+  | 'copywriters/entertainment_kanata'
+  | 'copywriters/tech_bunted'
+  | 'copywriters/streamer_basudin'
   | 'editor'
   | 'publisher';
 
 /** Maps each content pillar to its dedicated Copywriter agent handle. */
 export const PILLAR_AGENT_MAP: Record<Pillar, AgentHandle> = {
-  anime:        'copywriters/anime_satoshi',
-  gaming:       'copywriters/gaming_hikari',
-  infotainment: 'copywriters/infotainment_kenji',
-  manga:        'copywriters/manga_rina',
-  toys:         'copywriters/toys_taro',
+  esports:       'copywriters/esports_gani',
+  videogame:     'copywriters/videogame_valentino',
+  entertainment: 'copywriters/entertainment_kanata',
+  tech:          'copywriters/tech_bunted',
+  streamer:      'copywriters/streamer_basudin',
 };
 
 /** Maps each Copywriter handle to the persona's display name. */
 export const AGENT_PERSONA_MAP: Record<string, string> = {
-  'copywriters/anime_satoshi':       'Satoshi',
-  'copywriters/gaming_hikari':       'Hikari',
-  'copywriters/infotainment_kenji':  'Kenji',
-  'copywriters/manga_rina':          'Rina',
-  'copywriters/toys_taro':           'Taro',
+  'copywriters/esports_gani':          'Gani',
+  'copywriters/videogame_valentino':   'Valentino',
+  'copywriters/entertainment_kanata':  'Kanata',
+  'copywriters/tech_bunted':           'Bunted',
+  'copywriters/streamer_basudin':      'Basudin',
 };
 
 // ── Dispatch record ───────────────────────────────────────────────────────────
@@ -56,8 +56,8 @@ export interface DispatchRecord {
  * provided log callback.
  *
  * Usage:
- *   const d = dispatchAgent('copywriters/gaming_hikari', topic.title, this.log);
- *   // log already emitted: "[Orchestrator] → dispatch(copywriters/gaming_hikari | Hikari): ..."
+ *   const d = dispatchAgent('copywriters/videogame_valentino', topic.title, this.log);
+ *   // log already emitted: "[Orchestrator] → dispatch(copywriters/videogame_valentino | Valentino): ..."
  */
 export function dispatchAgent(
   agent:   AgentHandle,

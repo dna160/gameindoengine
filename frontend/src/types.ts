@@ -1,28 +1,28 @@
 // Frontend types — mirrors shared/types.ts for the browser bundle
 
 export type Pillar =
-  | 'anime'
-  | 'gaming'
-  | 'infotainment'
-  | 'manga'
-  | 'toys';
+  | 'esports'
+  | 'videogame'
+  | 'entertainment'
+  | 'tech'
+  | 'streamer';
 
-export const PILLARS: Pillar[] = ['anime', 'gaming', 'infotainment', 'manga', 'toys'];
+export const PILLARS: Pillar[] = ['esports', 'videogame', 'entertainment', 'tech', 'streamer'];
 
 export const PILLAR_LABELS: Record<Pillar, string> = {
-  anime: 'Japanese Anime',
-  gaming: 'Japanese Gaming',
-  infotainment: 'Japanese Infotainment',
-  manga: 'Japanese Manga',
-  toys: 'Japanese Toys/Collectibles',
+  esports: 'Esports',
+  videogame: 'Video Game',
+  entertainment: 'Entertainment',
+  tech: 'Teknologi',
+  streamer: 'Streamer',
 };
 
 export const PILLAR_COLORS: Record<Pillar, string> = {
-  anime:        'text-purple-400 border-purple-500/40 bg-purple-500/10',
-  gaming:       'text-blue-400   border-blue-500/40   bg-blue-500/10',
-  infotainment: 'text-cyan-400   border-cyan-500/40   bg-cyan-500/10',
-  manga:        'text-orange-400 border-orange-500/40 bg-orange-500/10',
-  toys:         'text-pink-400   border-pink-500/40   bg-pink-500/10',
+  esports:       'text-red-400     border-red-500/40     bg-red-500/10',
+  videogame:     'text-blue-400    border-blue-500/40    bg-blue-500/10',
+  entertainment: 'text-pink-400    border-pink-500/40    bg-pink-500/10',
+  tech:          'text-emerald-400 border-emerald-500/40 bg-emerald-500/10',
+  streamer:      'text-purple-400  border-purple-500/40  bg-purple-500/10',
 };
 
 export type ArticleStatus =

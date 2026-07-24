@@ -106,36 +106,44 @@ function sourceConfidence(domain: string): Confidence {
 
 // ── Pillar label → internal key map ──────────────────────────────────────────
 const PILLAR_FROM_LABEL: Record<string, Pillar> = {
-  'Japanese Anime':             'anime',
-  'Japanese Gaming':            'gaming',
-  'Japanese Infotainment':      'infotainment',
-  'Japanese Manga':             'manga',
-  'Japanese Toys/Collectibles': 'toys',
-  'Anime':  'anime',  'anime':  'anime',
-  'Gaming': 'gaming', 'gaming': 'gaming',
-  'Infotainment': 'infotainment', 'infotainment': 'infotainment',
-  'Manga':  'manga',  'manga':  'manga',
-  'Toys':   'toys',   'toys':   'toys',
-  'Collectibles':          'toys',
-  'Toys/Collectibles':     'toys',
-  'Japanese Toys':         'toys',
-  'Japanese Collectibles': 'toys',
-  'Japanese Entertainment':  'infotainment',
-  'Entertainment':           'infotainment',
-  'Japanese Pop Culture':    'infotainment',
-  'Japanese Comic':          'manga',
-  'Comics':                  'manga',
-  'Japanese Game':           'gaming',
-  'Japanese Games':          'gaming',
-  'Game': 'gaming',
+  'Esports':            'esports',
+  'esports':            'esports',
+  'E-sports':          'esports',
+  'Competitive Gaming': 'esports',
+  'Pro Gaming':         'esports',
+  'Tournament':         'esports',
+  'Video Game':         'videogame',
+  'videogame':          'videogame',
+  'Video Games':        'videogame',
+  'Gaming':             'videogame',
+  'Game':               'videogame',
+  'Games':              'videogame',
+  'Entertainment':      'entertainment',
+  'entertainment':      'entertainment',
+  'Hiburan':            'entertainment',
+  'Pop Culture':        'entertainment',
+  'Movies':             'entertainment',
+  'Music':              'entertainment',
+  'Tech':               'tech',
+  'tech':               'tech',
+  'Technology':         'tech',
+  'Teknologi':          'tech',
+  'Gadget':             'tech',
+  'Gadgets':            'tech',
+  'Streamer':           'streamer',
+  'streamer':           'streamer',
+  'Streaming':          'streamer',
+  'Live Content':       'streamer',
+  'Content Creator':    'streamer',
+  'Creator':            'streamer',
 };
 
 const PILLAR_LABEL: Record<Pillar, string> = {
-  anime:        'Japanese Anime',
-  gaming:       'Japanese Gaming',
-  infotainment: 'Japanese Infotainment',
-  manga:        'Japanese Manga',
-  toys:         'Japanese Toys/Collectibles',
+  esports:       'Esports',
+  videogame:     'Video Game',
+  entertainment: 'Entertainment',
+  tech:          'Teknologi',
+  streamer:      'Streamer',
 };
 
 /**
@@ -311,7 +319,8 @@ export class UnderquotaProtocol {
     targetPillars: Pillar[]
   ): Promise<PoolItem[]> {
     const feedResults = await Promise.allSettled(
-      feedUrls.map((url) => fetchFeed(url, 'anime', FEED_FALLBACK_MAP.get(url)))
+      // Placeholder pillar — the real pillar is assigned later by LLM triage.
+      feedUrls.map((url) => fetchFeed(url, 'videogame', FEED_FALLBACK_MAP.get(url)))
     );
 
     const rawItems:  PoolItem[] = [];
@@ -390,20 +399,17 @@ Your job is to classify this RSS item and extract key facts.
 **UNDERQUOTA PILLARS (still need articles):** ${targetLabels}
 
 **INSTRUCTIONS:**
-1. Classify the item into EXACTLY ONE of the following 5 pillars:
-   - **Japanese Anime** — TV anime, anime films, OVAs, voice actors (seiyuu),
-     anime studios, anime-original projects.
-   - **Japanese Gaming** — video games (console/PC/mobile/arcade), game
-     announcements, beta tests, esports, JRPGs, gacha, indie JP titles.
-   - **Japanese Infotainment** — J-pop / K-pop in Japan, idol groups
-     (AKB48, Sakurazaka46, Hello!Project, Johnny's), Oricon music charts,
-     live concerts, J-drama, Japanese films (live-action), variety shows,
-     celebrity news, music video releases. NOT anime films — those go to Anime.
-   - **Japanese Manga** — manga series (Shonen Jump, Magazine Pocket, etc.),
-     manga authors, comic awards, manga-original projects, light novels.
-   - **Japanese Toys/Collectibles** — figures (PVC/scale/Nendoroid),
-     plamo/gunpla, prize figures, trading cards, gachapon, hobby merch,
-     pre-order announcements, collectible toy news.
+1. Classify the item into EXACTLY ONE of the following 5 pillars (use the exact label):
+   - **Esports** — competitive gaming, tournaments, pro players & teams,
+     roster moves, prize pools, match results, MOBA / FPS / battle-royale scene.
+   - **Video Game** — video game news, releases, launches, reviews, patches,
+     trailers, single-player / AAA / indie titles (NON-competitive coverage).
+   - **Entertainment** — movies, TV & streaming series, music, celebrities,
+     concerts, awards, pop culture, film/show announcements.
+   - **Teknologi** — gadgets, smartphones, PCs, hardware, consumer electronics,
+     software, apps, AI, and tech-company news.
+   - **Streamer** — live streaming & content creators, Twitch/YouTube/TikTok
+     live, streamer news & drama, the creator economy, VTubers.
 
    If the item does not fit any pillar → REJECTED.
    Items that fit a non-underquota pillar are still accepted — the pipeline \
@@ -516,7 +522,7 @@ Summary: "${summary}"
 
     // ── Local fill tracking (parity with Scout's triageAll) ───────────────
     const localBuckets: Record<Pillar, number> = {
-      anime: 0, gaming: 0, infotainment: 0, manga: 0, toys: 0,
+      esports: 0, videogame: 0, entertainment: 0, tech: 0, streamer: 0,
     };
     const isPillarFull   = (p: Pillar) => localBuckets[p] >= MAX_CANDIDATES_PER_PILLAR;
     const allTargetsFull = ()           => targetPillars.every(isPillarFull);

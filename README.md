@@ -1,6 +1,6 @@
 # Synthetic Newsroom POC
 
-An autonomous newsroom pipeline that continuously ingests RSS feeds, researches visual context, drafts articles across 5 Japanese/Asian pop-culture content pillars, enforces editorial guardrails, and publishes to WordPress.
+An autonomous newsroom pipeline that continuously ingests RSS feeds, researches visual context, drafts articles across 5 gaming, entertainment, and tech content pillars, enforces editorial guardrails, and publishes to WordPress.
 
 ## Architecture
 
@@ -69,17 +69,17 @@ Only URLs that were **actually sent to the LLM** are tracked as seen — items f
 
 ---
 
-## Content Pillars & RSS Feeds
+## Content Pillars
 
-| Pillar | Primary Feeds |
-|--------|--------------|
-| Japanese Anime | Natalie (via Mastodon proxy) |
-| Japanese Gaming | Automaton, 4Gamer, Denfami |
-| Japanese Infotainment | Essential Japan, Natalie |
-| Japanese Manga | Automaton, Natalie, Denfami |
-| Japanese Toys/Collectibles | Dengeki Hobby, Toy People News |
+| Pillar | Label | Persona | Tone |
+|--------|-------|---------|------|
+| esports | Esports | Gani Fighter ("Gani") | Sharp, tactical esports copy — competitive gaming, tournaments, pro players, MOBA/FPS scene |
+| videogame | Video Game | Valentino Poppins ("Valentino") | Curator's voice, warm and tasteful game recommendations — releases, reviews, single-player/AAA/indie |
+| entertainment | Entertainment | Kanata Reyes ("Kanata") | Warm, conversational entertainment insider — movies, music, celebrities, TV, pop culture |
+| tech | Teknologi | Bunted Cargo ("Bunted") | Precise, deadpan, honest tech — gadgets, hardware, software, consumer tech, AI |
+| streamer | Streamer | Basudin KT ("Basudin") | Chaotic, community-native streamer voice — live streaming, content creators, Twitch/YouTube/TikTok live |
 
-Feed pillar affinity is learned empirically per run — feeds may produce articles across multiple pillars and the system adapts accordingly.
+RSS feed sources are being cleared and replaced for the new taxonomy. Feed pillar affinity is learned empirically per run — feeds may produce articles across multiple pillars and the system adapts accordingly.
 
 ---
 

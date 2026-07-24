@@ -1,20 +1,20 @@
 // Shared TypeScript types for Synthetic Newsroom POC
 
 export type Pillar =
-  | 'anime'
-  | 'gaming'
-  | 'infotainment'
-  | 'manga'
-  | 'toys';
+  | 'esports'
+  | 'videogame'
+  | 'entertainment'
+  | 'tech'
+  | 'streamer';
 
-export const PILLARS: Pillar[] = ['anime', 'gaming', 'infotainment', 'manga', 'toys'];
+export const PILLARS: Pillar[] = ['esports', 'videogame', 'entertainment', 'tech', 'streamer'];
 
 export const PILLAR_LABELS: Record<Pillar, string> = {
-  anime: 'Japanese Anime',
-  gaming: 'Japanese Gaming',
-  infotainment: 'Japanese Infotainment',
-  manga: 'Japanese Manga',
-  toys: 'Japanese Toys/Collectibles',
+  esports: 'Esports',
+  videogame: 'Video Game',
+  entertainment: 'Entertainment',
+  tech: 'Teknologi',
+  streamer: 'Streamer',
 };
 
 export type ArticleStatus =

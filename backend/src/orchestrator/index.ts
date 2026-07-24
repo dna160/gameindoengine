@@ -8,11 +8,11 @@
  * Workforce dispatched by the Orchestrator:
  *   Scout        → RSS ingestion + freshness triage
  *   Researcher   → Source crawl + fact extraction + image sourcing
- *   Satoshi      → Anime copywriting       (WP Author 2)
- *   Hikari       → Gaming copywriting      (WP Author 3)
- *   Kenji        → Infotainment copywriting (WP Author 4)
- *   Rina         → Manga copywriting       (WP Author 5)
- *   Taro         → Toys copywriting        (WP Author 6)
+ *   Gani         → Esports copywriting       (WP Author 7)
+ *   Valentino    → Video Game copywriting    (WP Author 8)
+ *   Kanata       → Entertainment copywriting (WP Author 9)
+ *   Bunted       → Tech copywriting          (WP Author 10)
+ *   Basudin      → Streamer copywriting      (WP Author 11)
  *   Editor       → Editorial review + 3-strike rule
  *   Publisher    → WordPress delivery + author/category assignment
  *
@@ -27,11 +27,11 @@ import { Researcher }        from '../agents/researcher';
 import { Editor }            from '../agents/editor';
 import { Publisher }              from '../agents/publisher/index';
 import { SocialMediaOrchestrator } from '../agents/social_media/orchestrator';
-import { AnimeSatoshi }      from '../agents/copywriters/anime_satoshi/index';
-import { GamingHikari }      from '../agents/copywriters/gaming_hikari/index';
-import { InfotainmentKenji } from '../agents/copywriters/infotainment_kenji/index';
-import { MangaRina }         from '../agents/copywriters/manga_rina/index';
-import { ToysTaro }          from '../agents/copywriters/toys_taro/index';
+import { EsportsGani }         from '../agents/copywriters/esports_gani/index';
+import { VideogameValentino }  from '../agents/copywriters/videogame_valentino/index';
+import { EntertainmentKanata } from '../agents/copywriters/entertainment_kanata/index';
+import { TechBunted }          from '../agents/copywriters/tech_bunted/index';
+import { StreamerBasudin }     from '../agents/copywriters/streamer_basudin/index';
 import {
   dispatchAgent,
   PILLAR_AGENT_MAP,
@@ -227,11 +227,11 @@ export class Orchestrator {
 
     // ── Pillar → Copywriter dispatch map ──────────────────────────────────────
     this.copywriters = {
-      anime:        new AnimeSatoshi((msg)      => this.addLog(msg, 'info', 'Satoshi')),
-      gaming:       new GamingHikari((msg)      => this.addLog(msg, 'info', 'Hikari')),
-      infotainment: new InfotainmentKenji((msg) => this.addLog(msg, 'info', 'Kenji')),
-      manga:        new MangaRina((msg)          => this.addLog(msg, 'info', 'Rina')),
-      toys:         new ToysTaro((msg)           => this.addLog(msg, 'info', 'Taro')),
+      esports:       new EsportsGani((msg)         => this.addLog(msg, 'info', 'Gani')),
+      videogame:     new VideogameValentino((msg)  => this.addLog(msg, 'info', 'Valentino')),
+      entertainment: new EntertainmentKanata((msg) => this.addLog(msg, 'info', 'Kanata')),
+      tech:          new TechBunted((msg)          => this.addLog(msg, 'info', 'Bunted')),
+      streamer:      new StreamerBasudin((msg)     => this.addLog(msg, 'info', 'Basudin')),
     };
   }
 
@@ -479,7 +479,7 @@ export class Orchestrator {
     }
 
     const buckets: Record<Pillar, ScoutItem[]> = {
-      anime: [], gaming: [], infotainment: [], manga: [], toys: [],
+      esports: [], videogame: [], entertainment: [], tech: [], streamer: [],
     };
 
     // ── Pre-fill buckets from Brain ───────────────────────────────────────────
@@ -1260,7 +1260,7 @@ export class Orchestrator {
 
     this.addLog(`${ORCHESTRATOR_IDENTITY} online. Run ID: ${this.runId}`, 'info', ORCHESTRATOR_IDENTITY);
     this.addLog(
-      'Workforce: Scout | Researcher | Satoshi(anime) | Hikari(gaming) | Kenji(info) | Rina(manga) | Taro(toys) | Editor | Publisher',
+      'Workforce: Scout | Researcher | Gani(esports) | Valentino(videogame) | Kanata(entertainment) | Bunted(tech) | Basudin(streamer) | Editor | Publisher',
       'info',
       ORCHESTRATOR_IDENTITY
     );

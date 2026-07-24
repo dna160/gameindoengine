@@ -16,11 +16,11 @@ import { PILLAR_LABELS } from '../../shared/types';
 
 // ── Internal category links ───────────────────────────────────────────────────
 export const INTERNAL_CATEGORY_LINKS: Record<Pillar, string> = {
-  anime:         'https://popshck.com/category/anime/',
-  gaming:        'https://popshck.com/category/game/',
-  infotainment:  'https://popshck.com/category/infotainment/',
-  manga:         'https://popshck.com/category/comic/',
-  toys:          'https://popshck.com/category/toys/',
+  esports:       'https://gameindo.com/category/esports/',
+  videogame:     'https://gameindo.com/category/home/',
+  entertainment: 'https://gameindo.com/category/entertainment/',
+  tech:          'https://gameindo.com/category/tech/',
+  streamer:      'https://gameindo.com/category/streamer/',
 };
 
 // ── Text utilities ────────────────────────────────────────────────────────────
@@ -48,10 +48,10 @@ export async function generateSeoMetadata(
   pillar:         Pillar,
   log:            (msg: string) => void
 ): Promise<{ keyphrase: string; metaDescription: string }> {
-  const prompt = `You are an SEO specialist for a Japanese pop-culture news portal publishing in Bahasa Indonesia.
+  const prompt = `You are an SEO specialist for a pop-culture, gaming & tech news portal publishing in Bahasa Indonesia.
 
 Generate:
-1. A focus keyphrase: 2–4 words in Bahasa Indonesia that best represent THIS article's specific topic (e.g. "update Genshin Impact", "chapter terbaru One Piece", "figma Naruto baru"). Must be SPECIFIC — never generic like "berita anime".
+1. A focus keyphrase: 2–4 words in Bahasa Indonesia that best represent THIS article's specific topic (e.g. "final MPL Indonesia", "review RTX 5070 Ti", "update Valorant terbaru"). Must be SPECIFIC — never generic like "berita game".
 2. A meta description: exactly 150–160 characters in Bahasa Indonesia that naturally includes the focus keyphrase and entices clicks.
 
 Article title: "${title}"

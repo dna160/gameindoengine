@@ -138,16 +138,17 @@ export class Researcher {
    */
   private async deepEvaluateTopic(item: ScoutItem): Promise<{ approved: boolean; reason: string }> {
     const pillarLabel = PILLAR_LABELS[item.pillar];
-    const prompt = `You are a senior editor at an Asian pop-culture newsroom covering anime, gaming, manga, toys, and infotainment.
+    const prompt = `You are a senior editor at a pop-culture, gaming & tech newsroom covering esports, video games, entertainment, tech, and streamers.
 
 Article Title: "${item.title}"
 Article Summary: "${item.summary}"
 Declared Pillar: "${pillarLabel}"
 
-**DEVELOPER/ORIGIN POLICY — Gaming pillar:**
-APPROVE games and gaming content from Japanese, Chinese, AND Korean developers/publishers.
-This includes (but is not limited to): HoYoverse (Genshin Impact, Honkai), miHoYo, NEXON, Netmarble, Krafton, NetEase, and any gacha/anime-style game regardless of country of origin.
-Only REJECT a gaming article if the game has zero connection to anime/manga aesthetics or Asian pop-culture (e.g. Western AAA shooters, sports sims).
+**DEVELOPER/ORIGIN POLICY — Esports & Video Game pillars:**
+APPROVE gaming and esports content from any region — global AAA, indie, mobile,
+and gacha titles are all in-scope (e.g. HoYoverse, NEXON, Netmarble, Krafton,
+NetEase, Riot, Valve, Nintendo, PlayStation, Xbox).
+Only REJECT a gaming/esports article if it has no genuine news value for our audience.
 
 Determine:
 1. Is this article genuinely relevant to the "${pillarLabel}" pillar using the policy above?
@@ -241,13 +242,13 @@ Respond in JSON format:
       ? `\nEnglish / Romaji names for entities in this article:\n${translationNotes.slice(0, 400)}`
       : '';
 
-    const prompt = `You are an image researcher for a Japanese pop-culture newsroom.
+    const prompt = `You are an image researcher for a pop-culture, gaming & tech newsroom.
 Generate 5 Google Images search queries for this article.
 
 Rules:
-- ALL queries must be written in English (no Japanese characters)
-- Every query must be SPECIFIC to this article's actual subject — character names, game titles, product names, artist names, etc.
-- NEVER produce generic queries like "Japanese Toys illustration" or "anime art" — those return unrelated stock photos
+- ALL queries must be written in English
+- Every query must be SPECIFIC to this article's actual subject — player/team names, game titles, product/gadget names, creator names, etc.
+- NEVER produce generic queries like "esports illustration" or "gaming art" — those return unrelated stock photos
 - Order queries from most specific (exact named subject) → progressively broader (related context)
 - Use English/Romaji names from translation notes where available — search engines handle these better than kanji
 - Each query should find images a reader would recognise as illustrating this exact article

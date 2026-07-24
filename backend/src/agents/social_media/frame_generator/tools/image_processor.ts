@@ -24,12 +24,13 @@ const STORY_W = 1080;
 const STORY_H = 1920;
 
 // ── Pillar → frame asset filename map ─────────────────────────────────────────
+// TODO: add frame asset PNGs for new categories
 const FRAME_MAP: Record<string, { post: string; story: string }> = {
-  anime:        { post: 'Anime Frame Popshck Post.png',          story: 'Anime Frame Popshck Story.png' },
-  gaming:       { post: 'Game Frame Popshck Post.png',           story: 'Game Frame Popshck Story.png' },
-  infotainment: { post: 'Infotainment Frame Popshck Post.png',   story: 'Infotainment Frame Popshck Story.png' },
-  manga:        { post: 'Manga Frame Popshck Post.png',          story: 'Manga Frame Popshck Story.png' },
-  toys:         { post: 'Toys Frame Popshck Post.png',           story: 'Toys Frame Popshck Story.png' },
+  esports:       { post: 'Esports Frame Popshck Post.png',       story: 'Esports Frame Popshck Story.png' },
+  videogame:     { post: 'Video Game Frame Popshck Post.png',    story: 'Video Game Frame Popshck Story.png' },
+  entertainment: { post: 'Entertainment Frame Popshck Post.png', story: 'Entertainment Frame Popshck Story.png' },
+  tech:          { post: 'Tech Frame Popshck Post.png',          story: 'Tech Frame Popshck Story.png' },
+  streamer:      { post: 'Streamer Frame Popshck Post.png',      story: 'Streamer Frame Popshck Story.png' },
 };
 
 
@@ -274,7 +275,7 @@ export async function processImage(params: ProcessImageParams): Promise<ProcessI
   const srcH = meta.height ?? 800;
 
   // ── 2. Resolve frame assets ──────────────────────────────────────────────────
-  const frameFiles = FRAME_MAP[pillar] ?? FRAME_MAP['anime'];
+  const frameFiles = FRAME_MAP[pillar] ?? FRAME_MAP['esports'];
   const postFramePath  = path.join(ASSETS_DIR, frameFiles.post);
   const storyFramePath = path.join(ASSETS_DIR, frameFiles.story);
 
@@ -345,7 +346,7 @@ async function renderFormat(params: {
     .toBuffer();
 
   // Resize frame to target dimensions (loadFrameWithTransparency fixes any
-  // frame that was exported without an alpha channel — e.g. Infotainment Story)
+  // frame that was exported without an alpha channel — e.g. Entertainment Story)
   const frameBase = await loadFrameWithTransparency(framePath);
   const frame = await sharp(frameBase)
     .resize(targetW, targetH, { fit: 'fill' })

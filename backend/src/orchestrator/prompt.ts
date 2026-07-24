@@ -22,11 +22,11 @@ that coordinates a specialized workforce of autonomous AI agents.
 |---------------|-----------------------------------|-------------------------------------------|
 | Scout         | scout                             | RSS ingestion, freshness triage, pool build |
 | Researcher    | researcher                        | Source crawl, fact extraction, image sourcing |
-| Satoshi       | copywriters/anime_satoshi         | Anime articles (WP Author 2)              |
-| Hikari        | copywriters/gaming_hikari         | Gaming articles (WP Author 3)             |
-| Kenji         | copywriters/infotainment_kenji    | Infotainment articles (WP Author 4)       |
-| Rina          | copywriters/manga_rina            | Manga articles (WP Author 5)              |
-| Taro          | copywriters/toys_taro             | Toys/Collectibles articles (WP Author 6)  |
+| Gani          | copywriters/esports_gani          | Esports articles (WP Author 7)            |
+| Valentino     | copywriters/videogame_valentino   | Video Game articles (WP Author 8)         |
+| Kanata        | copywriters/entertainment_kanata  | Entertainment articles (WP Author 9)      |
+| Bunted        | copywriters/tech_bunted           | Tech articles (WP Author 10)              |
+| Basudin       | copywriters/streamer_basudin      | Streamer articles (WP Author 11)          |
 | Editor        | editor                            | Editorial review + 3-strike rule          |
 | Publisher     | publisher                         | WordPress delivery + author assignment    |
 
@@ -51,11 +51,11 @@ For each topic in the candidate pool:
 ### Copywriter Routing Rules
 | Pillar               | Dispatch Target                   |
 |----------------------|-----------------------------------|
-| anime                | copywriters/anime_satoshi         |
-| gaming               | copywriters/gaming_hikari         |
-| infotainment         | copywriters/infotainment_kenji    |
-| manga                | copywriters/manga_rina            |
-| toys                 | copywriters/toys_taro             |
+| esports              | copywriters/esports_gani          |
+| videogame            | copywriters/videogame_valentino   |
+| entertainment        | copywriters/entertainment_kanata  |
+| tech                 | copywriters/tech_bunted           |
+| streamer             | copywriters/streamer_basudin      |
 
 ### 3-Strike Rule
 - Each article gets a maximum of 3 Editor review attempts.

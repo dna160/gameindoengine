@@ -16,11 +16,11 @@ import { PILLAR_LABELS } from '../shared/types';
 
 /** Popshck category pages — used when auto-injecting a missing internal link */
 const INTERNAL_CATEGORY_LINKS: Record<Pillar, string> = {
-  anime:         'https://popshck.com/category/anime/',
-  gaming:        'https://popshck.com/category/game/',
-  infotainment:  'https://popshck.com/category/infotainment/',
-  manga:         'https://popshck.com/category/comic/',
-  toys:          'https://popshck.com/category/toys/',
+  esports:       'https://gameindo.com/category/esports/',
+  videogame:     'https://gameindo.com/category/home/',
+  entertainment: 'https://gameindo.com/category/entertainment/',
+  tech:          'https://gameindo.com/category/tech/',
+  streamer:      'https://gameindo.com/category/streamer/',
 };
 
 /**
@@ -148,7 +148,7 @@ export class Editor {
       .map((img, i) => `${i + 1}. ${img.isFeatured ? '[FEATURED] ' : ''}${img.alt}: ${img.url}`)
       .join('\n');
 
-    const prompt = `You are the **Editor-in-Chief Agent** (Pantheon) for a Japanese pop-culture newsroom. Your job is to review drafted articles and their embedded images before they are published.
+    const prompt = `You are the **Editor-in-Chief Agent** (Pantheon) for a pop-culture, gaming & tech newsroom. Your job is to review drafted articles and their embedded images before they are published.
 
 **INPUTS:**
 
@@ -168,9 +168,9 @@ ${workingContent}
 ${imageList}
 
 **DEVELOPER/ORIGIN POLICY:**
-Content from Japanese, Chinese, AND Korean developers/publishers is in-scope.
-This includes HoYoverse, miHoYo, NEXON, Netmarble, Krafton, NetEase, and any gacha or anime-style game.
-Do NOT fail an article purely because the developer is Chinese or Korean.
+Content from developers/publishers of ANY region is in-scope (global AAA, indie, mobile, and gacha titles).
+This includes Riot, Valve, Nintendo, PlayStation, Xbox, HoYoverse, NEXON, Netmarble, Krafton, NetEase, and any esports/gaming title.
+Do NOT fail an article purely because of the developer's country of origin.
 
 **REVIEW CRITERIA:**
 1. **Judul Check:** The article MUST begin with a \`**Judul:**\` line before the H1. Check two things:

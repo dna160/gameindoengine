@@ -41,7 +41,7 @@ export class Publisher {
    * @param images      - Array of sourced images (one flagged as featured)
    * @param pillar      - Content pillar → determines WP Category ID
    * @param authorName  - Copywriter persona name → determines WP Author ID
-   *                      ('Satoshi' | 'Hikari' | 'Kenji' | 'Rina' | 'Taro')
+   *                      ('Gani' | 'Valentino' | 'Kanata' | 'Bunted' | 'Basudin')
    */
   async publish(params: {
     title:            string;

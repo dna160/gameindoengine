@@ -40,7 +40,7 @@ A fully autonomous newsroom pipeline that ingests RSS feeds, researches visual c
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │  Agent 3: Copywriter (Draft Writer)               │   │
 │  │  • Writes 300–400 word articles                   │   │
-│  │  • Pillar-specific tone (anime, gaming, etc.)     │   │
+│  │  • Pillar-specific tone (esports, videogame, etc.)│   │
 │  │  • Intelligent image placement in markdown       │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                          ↓                                  │
@@ -78,11 +78,11 @@ A fully autonomous newsroom pipeline that ingests RSS feeds, researches visual c
 
 The entire pipeline is strictly organized around these five content verticals:
 
-1. **Japanese Anime** — streaming, new seasons, production news
-2. **Japanese Gaming** — Nintendo, PS, arcade, mobile games
-3. **Japanese Infotainment** — news, culture, trending topics
-4. **Japanese Manga** — serialization, releases, industry news
-5. **Japanese Toys/Collectibles** — figures, models, limited editions
+1. **Esports** (`esports`) — competitive gaming, tournaments, pro players, MOBA/FPS scene
+2. **Video Game** (`videogame`) — video game news, releases, reviews, single-player/AAA/indie
+3. **Entertainment** (`entertainment`) — movies, music, celebrities, TV, pop culture
+4. **Teknologi** (`tech`) — gadgets, hardware, software, consumer tech, AI
+5. **Streamer** (`streamer`) — live streaming, content creators, Twitch/YouTube/TikTok live
 
 Every article is tagged with one pillar. Scout must find exactly **2 articles per pillar (10 total)** in each run.
 
@@ -98,27 +98,22 @@ Every article is tagged with one pillar. Scout must find exactly **2 articles pe
 - Quotas: strict enforcement (exactly 2/pillar)
 - **Feedback Loop:** If Researcher rejects a topic, Scout keeps searching until quota is met
 
-**RSS Feeds:**
+**RSS Feeds:** (feed sources are being cleared and replaced for the new taxonomy — TBD)
 ```
-Anime:
-  - https://www.animenewsnetwork.com/all/rss.xml
-  - https://feeds.feedburner.com/crunchyroll/animenews
+Esports:
+  - TBD
 
-Gaming:
-  - https://www.siliconera.com/feed/
-  - https://nintendoeverything.com/feed/
+Video Game:
+  - TBD
 
-Infotainment:
-  - https://www.tokyoreporter.com/feed/
-  - https://soranews24.com/feed/
+Entertainment:
+  - TBD
 
-Manga:
-  - https://www.cbr.com/tag/manga/feed/
-  - https://animecorner.me/category/manga/feed/
+Teknologi:
+  - TBD
 
-Toys/Collectibles:
-  - https://www.toyark.com/feed/
-  - https://www.figures.com/news/feed/
+Streamer:
+  - TBD
 ```
 
 ---
@@ -148,17 +143,17 @@ Toys/Collectibles:
 
 - **Input:** topic, facts, 3 images
 - **Output:** markdown article (300–400 words)
-- **Tone:** tailored per pillar (e.g., gaming = casual, infotainment = news-like)
+- **Tone:** tailored per pillar (e.g., esports = sharp/tactical, entertainment = warm/conversational)
 - **Image Placement:** intelligently embeds 3 images where they provide context
 - **Format:** markdown with `[featured]` label on first image for WordPress
 
-**Pillar Tone Guides:**
+**Pillar Tone Guides:** (persona per pillar)
 ```typescript
-anime: "enthusiastic, fan-focused, celebrate creators"
-gaming: "casual, accessible, highlight gameplay/community"
-infotainment: "journalistic, factual, straightforward"
-manga: "literary, celebrate storytelling, industry focus"
-toys: "collector-focused, detailed, appreciate craftsmanship"
+esports:       "Gani Fighter (Gani) — sharp, tactical, competitive-scene energy"
+videogame:     "Valentino Poppins (Valentino) — curator, warm, tasteful recommendations"
+entertainment: "Kanata Reyes (Kanata) — warm, conversational entertainment insider"
+tech:          "Bunted Cargo (Bunted) — precise, deadpan, honest tech"
+streamer:      "Basudin KT (Basudin) — chaotic, community-native streamer voice"
 ```
 
 ---
@@ -233,7 +228,7 @@ Legend:
 model Article {
   id              String   @id @default(cuid())
   title           String
-  pillar          String   // anime | gaming | infotainment | manga | toys
+  pillar          String   // esports | videogame | entertainment | tech | streamer
   sourceUrl       String
   status          String   // PROCESSING | GREEN | YELLOW | RED | FAILED | PUBLISHED
   revisionCount   Int      @default(0)
@@ -318,7 +313,7 @@ GET /api/dashboard/stats
   Returns: {
     total: number,
     byStatus: { GREEN, YELLOW, RED, FAILED },
-    byPillar: { anime, gaming, infotainment, manga, toys }
+    byPillar: { esports, videogame, entertainment, tech, streamer }
   }
 ```
 
@@ -703,9 +698,9 @@ The Scout was refactored from a self-managing agent into a pure stateless dispat
 | Tier 1 | Priority — Subpillar | `RSS_FEEDS` | `underquota_protocol` |
 | Tier 3 | Fallback — Broadest Net | All `RSS_FEEDS` scored by FeedMemory | `fallback_protocol` |
 
-- All feeds tagged with niche labels: `[gaming]`, `[anime]`, `[manga]`, `[toys]`, `[infotainment]`
+- All feeds tagged with niche labels: `[esports]`, `[videogame]`, `[entertainment]`, `[tech]`, `[streamer]`
 - Added **Tokyohive** and **Oricon** (4 sections: general, music, movie, lifestyle) to both Tier 2 and Tier 1
-- Populated previously empty `RSS_FEEDS.gaming` and `RSS_FEEDS.infotainment`
+- Populated previously empty `RSS_FEEDS.esports` and `RSS_FEEDS.entertainment`
 
 ---
 
@@ -797,8 +792,8 @@ Implements the "Brain reserve pool": Scout-approved articles that don't fit the 
 
 **Workflow:**
 ```
-Scout triage → gaming bucket full → topic banked
-Next run     → gaming bank recalled → Scout fills only remaining slots
+Scout triage → esports bucket full → topic banked
+Next run     → esports bank recalled → Scout fills only remaining slots
 Mid-run      → 3 editor strikes → banked topic recalled → Researcher → Copywriter
 ```
 

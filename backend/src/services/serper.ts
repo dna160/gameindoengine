@@ -57,14 +57,14 @@ export async function searchImages(
  */
 export function buildImageQuery(topic: string, pillar: string): string {
   const pillarTerms: Record<string, string> = {
-    anime: 'anime Japanese',
-    gaming: 'Japanese video game',
-    infotainment: 'Japan news culture',
-    manga: 'manga Japanese comic',
-    toys: 'Japanese collectible figure',
+    esports:       'esports tournament',
+    videogame:     'video game',
+    entertainment: 'entertainment celebrity',
+    tech:          'technology gadget',
+    streamer:      'live streamer content creator',
   };
 
-  const prefix = pillarTerms[pillar] || 'Japan';
+  const prefix = pillarTerms[pillar] || 'gaming';
   // Truncate topic to avoid overly long queries
   const shortTopic = topic.split(' ').slice(0, 6).join(' ');
   return `${prefix} ${shortTopic}`;

@@ -63,11 +63,11 @@ function stripHtml(html: string): string {
 }
 function detectPillar(title: string, content: string): string {
   const text = (title + ' ' + content).toLowerCase();
-  if (/\b(rc car|remote.?control|amphibious|buggy rc|diecast|lego|mainan|gashapon|capsule toy|action figure|model kit|gunpla|nendoroid|scale figure)\b/.test(text)) return 'toys';
-  if (/\b(game|gaming|rpg|fps|moba|esports|console|playstation|xbox|nintendo|steam|arknights|genshin|honkai)\b/.test(text)) return 'gaming';
-  if (/\b(manga|comic|webtoon|manhwa|chapter)\b/.test(text)) return 'manga';
-  if (/\b(anime|cosplay|figure|figurine|seiyuu|voice actor)\b/.test(text)) return 'anime';
-  return 'infotainment';
+  if (/\b(streamer|streaming|twitch|youtuber|tiktok live|content creator|vtuber|live stream)\b/.test(text)) return 'streamer';
+  if (/\b(esports|tournament|turnamen|moba|pro player|mlbb|mobile legends|valorant|dota|league of legends|championship)\b/.test(text)) return 'esports';
+  if (/\b(gadget|hardware|gpu|cpu|smartphone|laptop|chipset|processor|software|ai)\b/.test(text)) return 'tech';
+  if (/\b(game|gaming|rpg|fps|console|playstation|xbox|nintendo|steam|release|gameplay)\b/.test(text)) return 'videogame';
+  return 'entertainment';
 }
 
 // ── OAuth 1.0a ────────────────────────────────────────────────────────────────

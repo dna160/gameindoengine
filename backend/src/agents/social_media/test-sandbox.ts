@@ -7,12 +7,12 @@
  *
  * Usage:
  *   npx tsx src/agents/social_media/test-sandbox.ts
- *   npx tsx src/agents/social_media/test-sandbox.ts --pillar gaming
- *   npx tsx src/agents/social_media/test-sandbox.ts --pillar anime --image https://example.com/image.jpg
+ *   npx tsx src/agents/social_media/test-sandbox.ts --pillar videogame
+ *   npx tsx src/agents/social_media/test-sandbox.ts --pillar esports --image https://example.com/image.jpg
  *   npx tsx src/agents/social_media/test-sandbox.ts --skip-vision
  *
  * Flags:
- *   --pillar <name>   anime | gaming | infotainment | manga | toys  (default: anime)
+ *   --pillar <name>   esports | videogame | entertainment | tech | streamer  (default: esports)
  *   --image  <url>    Source image URL to process (default: built-in test URL per pillar)
  *   --skip-vision     Use a centre focal point instead of calling DeepSeek Vision (faster/offline)
  */
@@ -38,18 +38,18 @@ const getArg = (flag: string): string | undefined => {
 };
 const hasFlag = (flag: string): boolean => args.includes(flag);
 
-const PILLAR      = getArg('--pillar') ?? 'anime';
+const PILLAR      = getArg('--pillar') ?? 'esports';
 const SKIP_VISION = hasFlag('--skip-vision');
 
 // ── Default test images per pillar ───────────────────────────────────────────
 // Using reliable, high-resolution public domain / free-to-use images.
 // Swap with any URL you like via --image flag.
 const DEFAULT_IMAGE_BY_PILLAR: Record<string, string> = {
-  anime:        'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Sharingan_triple.svg/800px-Sharingan_triple.svg.png',
-  gaming:       'https://hotpink-dogfish-392833.hostingersite.com/wp-content/uploads/2026/04/article-image-1775550019349.jpg',
-  infotainment: 'https://picsum.photos/seed/infotainment/1200/800',
-  manga:        'https://picsum.photos/seed/manga/1200/800',
-  toys:         'https://hotpink-dogfish-392833.hostingersite.com/wp-content/uploads/2026/04/article-image-1775549835176.jpg',
+  esports:       'https://picsum.photos/seed/esports/1200/800',
+  videogame:     'https://hotpink-dogfish-392833.hostingersite.com/wp-content/uploads/2026/04/article-image-1775550019349.jpg',
+  entertainment: 'https://picsum.photos/seed/entertainment/1200/800',
+  tech:          'https://picsum.photos/seed/tech/1200/800',
+  streamer:      'https://picsum.photos/seed/streamer/1200/800',
 };
 
 // Use pillar-specific default, then picsum as final fallback
@@ -58,15 +58,15 @@ const IMAGE_URL         = getArg('--image') ?? DEFAULT_IMAGE_URL;
 
 // ── Test articles per pillar ──────────────────────────────────────────────────
 const TEST_ARTICLES: Record<string, string> = {
-  anime: `# Demon Slayer Season 4: Arc Hashira Training Resmi Dikonfirmasi!
+  esports: `# Grand Final MPL ID Season 14: RRQ vs ONIC Pecahkan Rekor Penonton!
 
-Studio Ufotable telah secara resmi mengumumkan bahwa Demon Slayer: Kimetsu no Yaiba Season 4 akan mengadaptasi arc Hashira Training secara penuh. Pengumuman ini datang bersamaan dengan rilisnya visual key baru yang memperlihatkan Tanjiro sedang berlatih bersama Flame Hashira Rengoku.
+Grand Final Mobile Legends Professional League Indonesia (MPL ID) Season 14 antara RRQ Hoshi dan ONIC Esports resmi mencatatkan rekor peak viewers tertinggi sepanjang sejarah esports Tanah Air. Pertandingan best-of-seven ini disaksikan lebih dari 3,2 juta penonton secara bersamaan di seluruh platform streaming.
 
-Season baru ini dijadwalkan tayang pada musim panas 2025. Menurut laporan, arc ini akan terdiri dari 10 episode dengan kualitas animasi yang diklaim melampaui arc Entertainment District yang telah memenangkan berbagai penghargaan internasional.
+Kedua tim saling jual-beli momentum hingga game ketujuh yang menegangkan. RRQ mengandalkan hero signature jungler mereka, sementara ONIC bermain agresif lewat rotasi cepat dan kontrol objektif Lord yang rapi. Draft pick di game penentu jadi sorotan analis karena keberanian kedua tim melakukan counter-pick berisiko tinggi.
 
-Penggemar anime Jepang di seluruh dunia menyambut berita ini dengan antusias. Di Twitter Jepang, hashtag #KimetsuNoYaiba langsung trending dalam hitungan menit setelah pengumuman resmi dilakukan oleh Ufotable melalui akun Twitter resmi mereka.`,
+Kemenangan ini memastikan tiket ke turnamen internasional M-Series. Pro player MVP mendapat sorotan khusus atas performa clutch-nya di teamfight terakhir yang langsung viral di media sosial komunitas esports Indonesia.`,
 
-  gaming: `# Panduan Rossi Arknights: Endfield – Attacker Serba Bisa Firepower Gila!
+  videogame: `# Panduan Rossi Arknights: Endfield – Attacker Serba Bisa Firepower Gila!
 
 Hypergryph dan GRYPHLINE baru saja buka special scout 'Wolf Pearl' untuk Arknights: Endfield pada 29 Maret lalu. Sorotan utamanya? Operator ★6 baru bernama Rossi, attacker hybrid physical-arts yang bikin tim kamu ngegas maksimal! Dengan DPS tinggi, self-buff, self-heal, sustained damage, plus debuff jahat, Rossi cocok banget buat komposisi physical maupun arts. Dia bisa pair sama hampir semua operator, tapi gimana cara maksimalin potensinya? Yuk, breakdown lengkap ala gamer pro!
 
@@ -76,7 +76,7 @@ Chain Skill Rossi fokus pada burst damage saat musuh kena crash. Ia nembak area 
 
 Untuk build optimal, prioritaskan ATK dan CRIT DMG. Rossi cocok dipasangkan dengan operator yang bisa crash musuh (misalnya Pith atau Defender tanky). Tim ideal: Rossi sebagai DPS utama, satu crasher, satu healer/support arts. Dengan setup ini, Rossi bisa solo most stages di Arknights: Endfield.`,
 
-  infotainment: `# Yoasobi Umumkan Konser World Tour 2025, Jakarta Masuk Daftar!
+  entertainment: `# Yoasobi Umumkan Konser World Tour 2025, Jakarta Masuk Daftar!
 
 Duo musik Jepang fenomenal YOASOBI telah mengumumkan tur konser dunia pertama mereka bertajuk "Into The Night World Tour 2025". Yang membuat penggemar Indonesia histeris, Jakarta masuk sebagai salah satu kota yang akan dikunjungi pada tanggal 12 Juli 2025.
 
@@ -84,24 +84,24 @@ Ikura dan Ayase akan membawa setlist penuh hits mereka termasuk "Idol", "Yoru ni
 
 Tiket presale dijadwalkan dibuka pada 1 Februari 2025 melalui platform resmi. Kapasitas venue diperkirakan 15.000 penonton dan prediksi tiket akan habis dalam waktu sangat singkat.`,
 
-  manga: `# One Piece Chapter 1110: Rahasia Kekuatan Joy Boy Akhirnya Terungkap!
+  tech: `# NVIDIA Umumkan GPU RTX 5070 Ti, Harga Lebih Terjangkau dari Ekspektasi!
 
-Chapter terbaru One Piece yang dirilis Senin ini memecahkan rekor pembaca online terbanyak dalam sejarah manga Shonen Jump. Oda sensei mengungkap detail mengejutkan tentang kekuatan asli Joy Boy yang selama ini menjadi misteri terbesar dalam series ini.
+NVIDIA resmi mengumumkan kartu grafis GeForce RTX 5070 Ti berbasis arsitektur Blackwell terbaru. Yang bikin heboh komunitas PC gaming, harga rilisnya dipatok lebih rendah dari prediksi para analis, yakni di kisaran 749 dolar AS untuk versi Founders Edition.
 
-Dalam chapter berjudul "The Will That Transcends Time", Nika (Luffy) berhadapan langsung dengan Gorosei Saturn dalam pertarungan yang mengguncang fondasi dunia One Piece. Kemampuan Gear Fifth yang baru diperlihatkan jauh melampaui ekspektasi para penggemar.
+Dari sisi spesifikasi, RTX 5070 Ti membawa 16GB memori GDDR7 dengan bandwidth yang jauh melampaui generasi sebelumnya. Fitur DLSS 4 dengan Multi Frame Generation diklaim mampu melipatgandakan frame rate di game AAA modern tanpa mengorbankan kualitas visual secara signifikan.
 
-Editor Shonen Jump menyatakan bahwa chapter ini adalah turning point terbesar dalam 25 tahun sejarah One Piece. Komunitas manga global saat ini sedang ramai berdiskusi tentang implikasi dari revelasi besar tersebut.`,
+Dalam benchmark internal, GPU ini mencatat lonjakan performa hingga 40% dibanding RTX 4070 Ti pada resolusi 1440p. Konsumsi daya juga lebih efisien berkat proses fabrikasi terbaru. Produk dijadwalkan tersedia di pasaran global mulai kuartal ini, termasuk Indonesia lewat distributor resmi.`,
 
-  toys: `# Senyum Cerah Mekar Seperti Bunga! Osaki Tenka Shiny Colors Bertransformasi Jadi Figure Mewah Gardien Amethyst
+  streamer: `# Streamer Windah Basudara Pecahkan Rekor Konser Amal, Galang Miliaran Rupiah!
 
-Union Creative baru aja umumkan figure pre-painted completed skala 1/6 dari Osaki Tenka dalam kostum ikonik "Gardien Amethyst". Figur cantik ini bikin hati meleleh dengan senyum cerah yang mekar seperti bunga, lengkap dengan rambut fluffy mengembang dramatis. Pre-order udah dibuka di Rakuten Books seharga 31.928 yen (termasuk pajak), dengan harga referensi 33.000 yen. Kode produk UC002186-01, ukuran lebar 20 cm x tinggi 17,5 cm — pas banget buat display di rak koleksi premium kamu.
+Content creator dan live streamer ternama Indonesia sukses menggelar charity stream maraton selama 12 jam nonstop di kanal YouTube dan Twitch miliknya. Acara amal ini berhasil mengumpulkan donasi lebih dari 2 miliar rupiah dari puluhan ribu penonton yang hadir secara live.
 
-Detail craftsmanship-nya luar biasa, khas standar tinggi Union Creative yang sering muncul di event seperti Wonder Festival. Terbuat dari PVC dan ABS berkualitas, figure ini mereproduksi sempurna kostum Gardien Amethyst: bulu-bulu berlapis, aksesori rambut detail, hingga ekspresi wajah Tenka yang ceria khas karakter Illumination Stars di The Idolmaster Shiny Colors.
+Sepanjang siaran, sang streamer memainkan berbagai game viral sambil berinteraksi langsung dengan komunitasnya lewat fitur donasi dan chat. Beberapa fellow content creator turut bergabung sebagai bintang tamu, membuat momen kolaborasi yang langsung jadi klip viral di TikTok dan Instagram Reels.
 
-Buat fans iDOLM@STER atau kolektor figure anime premium, ini wajib masuk wishlist. Jadwal pengiriman estimasi akhir 2026. Jangan sampai ketinggalan pre-order sebelum slot habis!`,
+Seluruh dana yang terkumpul disalurkan untuk program pendidikan anak kurang mampu. Aksi ini menuai apresiasi luas dan menegaskan pengaruh besar kreator live streaming dalam menggerakkan aksi sosial di kalangan generasi muda Indonesia.`,
 };
 
-const TEST_ARTICLE = TEST_ARTICLES[PILLAR] ?? TEST_ARTICLES['anime'];
+const TEST_ARTICLE = TEST_ARTICLES[PILLAR] ?? TEST_ARTICLES['esports'];
 
 // ── Output directory ──────────────────────────────────────────────────────────
 const OUTPUT_DIR = path.resolve(__dirname, '../../../test-output');

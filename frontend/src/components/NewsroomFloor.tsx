@@ -42,11 +42,11 @@ function StatBlock({ label, value, color }: { label: string; value: number; colo
 function PillarBar({ pillar, count, total }: { pillar: string; count: number; total: number }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const colors: Record<string, string> = {
-    anime: 'bg-purple-500',
-    gaming: 'bg-blue-500',
-    infotainment: 'bg-cyan-500',
-    manga: 'bg-orange-500',
-    toys: 'bg-pink-500',
+    esports: 'bg-purple-500',
+    videogame: 'bg-blue-500',
+    entertainment: 'bg-cyan-500',
+    tech: 'bg-orange-500',
+    streamer: 'bg-pink-500',
   };
   const barColor = colors[pillar] ?? 'bg-newsroom-blue';
 

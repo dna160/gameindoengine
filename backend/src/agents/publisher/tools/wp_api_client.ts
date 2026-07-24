@@ -6,31 +6,31 @@
  * - Post creation with author ID and category assignment
  *
  * Author–WP User ID mapping (matches persona names from specialized copywriters):
- *   Satoshi → 10 (Anime)        WP user: Harry Kaguya
- *   Hikari  → 7  (Gaming)       WP user: MRYAKUZA Pantheon
- *   Kenji   → 9  (Infotainment) WP user: Lisa Kagawa
- *   Rina    → 11 (Manga)        WP user: Steven Nelson
- *   Taro    → 8  (Toys/Collectibles) WP user: FINALHERO Pantheon
+ *   Gani      → 7  (Esports)       WP user: gani-fighter
+ *   Valentino → 8  (Video Game)    WP user: valentino-poppins
+ *   Kanata    → 9  (Entertainment) WP user: kanata-reyes
+ *   Bunted    → 10 (Tech)          WP user: bunted-cargo
+ *   Basudin   → 11 (Streamer)      WP user: basudin-kt
  */
 
 import type { ArticleImage, Pillar } from '../../../shared/types';
 
-// ── Author ID mapping ─────────────────────────────────────────────────────────
+// ── Author ID mapping (gameindo.com) ──────────────────────────────────────────
 export const AUTHOR_IDS: Record<string, number> = {
-  Satoshi: 10, // WP user: Harry Kaguya
-  Hikari:   7, // WP user: MRYAKUZA Pantheon
-  Kenji:    9, // WP user: Lisa Kagawa
-  Rina:    11, // WP user: Steven Nelson
-  Taro:     8, // WP user: FINALHERO Pantheon
+  Gani:       7,  // WP user: gani-fighter
+  Valentino:  8,  // WP user: valentino-poppins
+  Kanata:     9,  // WP user: kanata-reyes
+  Bunted:    10,  // WP user: bunted-cargo
+  Basudin:   11,  // WP user: basudin-kt
 };
 
-// ── Category ID mapping ───────────────────────────────────────────────────────
+// ── Category ID mapping (gameindo.com) ────────────────────────────────────────
 export const CATEGORY_IDS: Record<Pillar, number> = {
-  anime:         11,
-  gaming:        13,
-  infotainment:  10,
-  manga:         14,
-  toys:          12,
+  esports:       3,
+  videogame:     2,
+  entertainment: 6,
+  tech:          5,
+  streamer:      4,
 };
 
 // ── Interfaces ────────────────────────────────────────────────────────────────

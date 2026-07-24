@@ -30,30 +30,31 @@ export interface WpMediaResponse {
   source_url: string;
 }
 
+// gameindo.com WordPress category IDs (fetched from /wp-json/wp/v2/categories).
 const wpCategoryMap: Record<Pillar, number> = {
-  anime: 11,        // Anime
-  gaming: 13,       // Game
-  infotainment: 10, // Infotainment
-  manga: 14,        // Comic (no dedicated Manga category)
-  toys: 12,         // Toys
+  esports:       3, // Esports        (slug: esports)
+  videogame:     2, // Video Game     (slug: home)
+  entertainment: 6, // Entertainment  (slug: entertainment)
+  tech:          5, // Tech           (slug: tech)
+  streamer:      4, // Streamer       (slug: streamer)
 };
 
 /**
- * Pillar → WordPress Author ID mapping.
+ * Pillar → WordPress Author ID mapping (gameindo.com).
  * Must stay in sync with AUTHOR_IDS in publisher/tools/wp_api_client.ts.
  *
- *   anime        → 10  (Satoshi   — WP user: Harry Kaguya)
- *   gaming       → 7   (Hikari    — WP user: MRYAKUZA Pantheon)
- *   infotainment → 9   (Kenji     — WP user: Lisa Kagawa)
- *   manga        → 11  (Rina      — WP user: Steven Nelson)
- *   toys         → 8   (Taro      — WP user: FINALHERO Pantheon)
+ *   esports       → 7   (Gani      — WP user: gani-fighter)
+ *   videogame     → 8   (Valentino — WP user: valentino-poppins)
+ *   entertainment → 9   (Kanata    — WP user: kanata-reyes)
+ *   tech          → 10  (Bunted    — WP user: bunted-cargo)
+ *   streamer      → 11  (Basudin   — WP user: basudin-kt)
  */
 const wpAuthorMap: Record<Pillar, number> = {
-  anime:         10, // Harry Kaguya
-  gaming:        7,  // MRYAKUZA Pantheon
-  infotainment:  9,  // Lisa Kagawa
-  manga:         11, // Steven Nelson
-  toys:          8,  // FINALHERO Pantheon
+  esports:       7,  // gani-fighter
+  videogame:     8,  // valentino-poppins
+  entertainment: 9,  // kanata-reyes
+  tech:          10, // bunted-cargo
+  streamer:      11, // basudin-kt
 };
 
 function getAuthHeader(): string {

@@ -9,7 +9,7 @@
  *
  * Flags:
  *   --url <url>       WordPress article URL (required)
- *   --pillar <name>   anime | gaming | infotainment | manga | toys  (auto-detected if omitted)
+ *   --pillar <name>   esports | videogame | entertainment | tech | streamer  (auto-detected if omitted)
  *   --dry-run         Generate images but do NOT post to Instagram
  *   --skip-vision     Use centre focal point instead of DeepSeek Vision (faster)
  */
@@ -66,11 +66,11 @@ function slugFromUrl(url: string): string {
 function detectPillar(title: string, content: string): string {
   const text = (title + ' ' + content).toLowerCase();
   // Check most-specific first to avoid false positives
-  if (/\b(rc car|remote.?control|amphibious|buggy rc|diecast|lego|mainan|gashapon|capsule toy|action figure|model kit|gunpla|nendoroid|scale figure)\b/.test(text)) return 'toys';
-  if (/\b(game|gaming|rpg|fps|moba|esports|console|playstation|xbox|nintendo|steam|arknights|genshin|honkai)\b/.test(text)) return 'gaming';
-  if (/\b(manga|comic|webtoon|manhwa|chapter)\b/.test(text)) return 'manga';
-  if (/\b(anime|cosplay|figure|figurine|seiyuu|voice actor)\b/.test(text)) return 'anime';
-  return 'infotainment';
+  if (/\b(streamer|streaming|twitch|youtuber|tiktok live|content creator|vtuber|live stream)\b/.test(text)) return 'streamer';
+  if (/\b(esports|tournament|turnamen|moba|pro player|mlbb|mobile legends|valorant|dota|league of legends|championship)\b/.test(text)) return 'esports';
+  if (/\b(gadget|hardware|gpu|cpu|smartphone|laptop|chipset|processor|software|ai)\b/.test(text)) return 'tech';
+  if (/\b(game|gaming|rpg|fps|console|playstation|xbox|nintendo|steam|release|gameplay)\b/.test(text)) return 'videogame';
+  return 'entertainment';
 }
 
 /** Strip HTML tags */
@@ -184,7 +184,7 @@ async function main(): Promise<void> {
   content = articleBody
     .replace(/!\[Image \d+:[^\]]*\]\([^)]+\)/g, '')   // strip image embeds
     .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, '$1') // strip links, keep text
-    .replace(/^\s*[*-]\s+.*(anime|toys|game|comic|infotainment|manga).*$/gim, '') // nav items
+    .replace(/^\s*[*-]\s+.*(esports|videogame|game|gaming|entertainment|tech|streamer).*$/gim, '') // nav items
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
