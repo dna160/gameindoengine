@@ -11,5 +11,8 @@ cmds = [
   "cd backend && npx prisma generate && npm run build"
 ]
 
+# Run prisma from backend/ so it uses the pinned local CLI (v5) that matches
+# @prisma/client — running `npx prisma` from the repo root downloads prisma@latest
+# (v6) and crashes the query engine with a version mismatch.
 [start]
-cmd = "npx prisma db push --schema=backend/prisma/schema.prisma --accept-data-loss && node backend/dist/server.js"
+cmd = "cd backend && npx prisma db push --accept-data-loss && node dist/server.js"
