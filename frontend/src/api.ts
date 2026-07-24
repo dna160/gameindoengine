@@ -1,7 +1,11 @@
 /**
  * API client for the Synthetic Newsroom backend.
- * Uses VITE_API_URL env var if set, otherwise falls back to the production backend.
- * In dev, Vite proxy forwards /api → localhost:3003 (relative URL works locally).
+ * Uses VITE_API_URL env var if set, otherwise falls back to a same-origin
+ * relative base ('/api') — the backend serves this SPA, so the API lives on the
+ * same host. In dev, Vite proxy forwards /api → localhost:3003.
+ *
+ * NOTE: do NOT hardcode a specific backend URL here — a stale absolute URL
+ * makes the dashboard silently read from the wrong deployment's database.
  */
 
 import type {
@@ -11,7 +15,7 @@ import type {
   ApiResponse,
 } from './types';
 
-const BASE = (import.meta.env.VITE_API_URL || 'https://back-end-production-14be.up.railway.app') + '/api';
+const BASE = (import.meta.env.VITE_API_URL || '') + '/api';
 
 async function request<T>(
   path: string,
