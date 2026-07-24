@@ -4,7 +4,7 @@ import type { Pillar } from '../shared/types';
 const parser = new Parser({
   timeout: 10000,
   headers: {
-    'User-Agent': 'Mozilla/5.0 (compatible; SyntheticNewsroom/1.0; +https://github.com/dna160/popshckv3)',
+    'User-Agent': 'Mozilla/5.0 (compatible; GameindoEngine/1.0; +https://github.com/dna160/gameindoengine)',
   },
 });
 

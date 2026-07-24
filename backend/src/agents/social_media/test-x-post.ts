@@ -182,7 +182,7 @@ async function main(): Promise<void> {
   if (!jinaRes.ok) throw new Error(`Jina Reader failed (${jinaRes.status})`);
 
   const jinaData = await jinaRes.json() as { data: { title: string; content: string } };
-  const title   = jinaData.data.title.replace(/\s*[–—-]\s*POPSHCK?K?.*$/i, '').trim();
+  const title   = jinaData.data.title.replace(/\s*[–—-]\s*GAMEINDO.*$/i, '').trim();
   const content = jinaData.data.content
     .replace(/!\[Image \d+:[^\]]*\]\([^)]+\)/g, '')
     .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, '$1')

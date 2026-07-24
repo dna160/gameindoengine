@@ -4,7 +4,7 @@
  * Core image rendering pipeline for social media assets:
  *   1. Fetch source image from URL
  *   2. Smart-crop to Post (1:1 1080×1080) and Story (9:16 1080×1920) using focal point
- *   3. Composite the pillar-specific Popshck branded frame over the crop
+ *   3. Composite the pillar-specific Gameindo branded frame over the crop
  *   4. Render the image_copy text using Quantico Bold via SVG overlay
  *
  * Returns two Buffers ready for upload or review.
@@ -26,11 +26,11 @@ const STORY_H = 1920;
 // ── Pillar → frame asset filename map ─────────────────────────────────────────
 // TODO: add frame asset PNGs for new categories
 const FRAME_MAP: Record<string, { post: string; story: string }> = {
-  esports:       { post: 'Esports Frame Popshck Post.png',       story: 'Esports Frame Popshck Story.png' },
-  videogame:     { post: 'Video Game Frame Popshck Post.png',    story: 'Video Game Frame Popshck Story.png' },
-  entertainment: { post: 'Entertainment Frame Popshck Post.png', story: 'Entertainment Frame Popshck Story.png' },
-  tech:          { post: 'Tech Frame Popshck Post.png',          story: 'Tech Frame Popshck Story.png' },
-  streamer:      { post: 'Streamer Frame Popshck Post.png',      story: 'Streamer Frame Popshck Story.png' },
+  esports:       { post: 'Esports Frame Gameindo Post.png',       story: 'Esports Frame Gameindo Story.png' },
+  videogame:     { post: 'Video Game Frame Gameindo Post.png',    story: 'Video Game Frame Gameindo Story.png' },
+  entertainment: { post: 'Entertainment Frame Gameindo Post.png', story: 'Entertainment Frame Gameindo Story.png' },
+  tech:          { post: 'Tech Frame Gameindo Post.png',          story: 'Tech Frame Gameindo Story.png' },
+  streamer:      { post: 'Streamer Frame Gameindo Post.png',      story: 'Streamer Frame Gameindo Story.png' },
 };
 
 

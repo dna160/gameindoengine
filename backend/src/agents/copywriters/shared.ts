@@ -142,7 +142,7 @@ If the issue mentions a MISSING OUTBOUND LINK:
   → Do not add a standalone paragraph — weave it into existing text.
 
 If the issue mentions a MISSING INTERNAL LINK:
-  → Embed a link to the Popshck category page inside an existing sentence.
+  → Embed a link to the Gameindo category page inside an existing sentence.
   → Use: [berita ${pillarLabel} lainnya](${internalLink})
   → Do not add a standalone paragraph — weave it into existing text.
 
@@ -182,5 +182,5 @@ export function seoRulesBlock(sourceUrl: string, pillar: Pillar): string {
 8. **H2 Subheading:** At least one ## subheading MUST name the article's specific subject. No generic headings like "Informasi Terbaru".
 9. **Image Alt Text:** Every image MUST have descriptive alt text including the subject. Format: \`![Subject - context](URL)\`. Never use \`![featured](URL)\`.
 10. **Outbound Link:** Include at least one hyperlink to the original source inside the body text. Use natural anchor text, e.g. \`[baca selengkapnya di sini](${sourceUrl})\`.
-11. **Internal Link:** Include one hyperlink to the Popshck category page inside the body text. Use natural anchor text, e.g. \`[berita ${pillarLabel} lainnya](${internalLink})\`.`;
+11. **Internal Link:** Include one hyperlink to the Gameindo category page inside the body text. Use natural anchor text, e.g. \`[berita ${pillarLabel} lainnya](${internalLink})\`.`;
 }

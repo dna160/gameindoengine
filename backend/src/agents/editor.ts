@@ -14,7 +14,7 @@ import { marked } from 'marked';
 import type { Pillar, DraftArticle, EditorResult } from '../shared/types';
 import { PILLAR_LABELS } from '../shared/types';
 
-/** Popshck category pages — used when auto-injecting a missing internal link */
+/** Gameindo category pages — used when auto-injecting a missing internal link */
 const INTERNAL_CATEGORY_LINKS: Record<Pillar, string> = {
   esports:       'https://gameindo.com/category/esports/',
   videogame:     'https://gameindo.com/category/home/',
@@ -106,15 +106,15 @@ export class Editor {
     const pillarLabel = PILLAR_LABELS[draft.pillar];
 
     // Auto-fix 1: Outbound link — append a "read more" line to the source article
-    if (!/\[.+?\]\(https?:\/\/(?!(?:www\.)?popshck\.com).+?\)/i.test(workingContent)) {
+    if (!/\[.+?\]\(https?:\/\/(?!(?:www\.)?gameindo\.com).+?\)/i.test(workingContent)) {
       workingContent += `\n\n*Sumber: [baca artikel selengkapnya di sini](${draft.sourceUrl})*`;
       seoFixes.push('outbound link');
     }
 
     // Auto-fix 2: Internal link — append a category discovery line
-    if (!/\[.+?\]\(https?:\/\/(?:www\.)?popshck\.com.+?\)/i.test(workingContent)) {
+    if (!/\[.+?\]\(https?:\/\/(?:www\.)?gameindo\.com.+?\)/i.test(workingContent)) {
       const internalUrl = INTERNAL_CATEGORY_LINKS[draft.pillar];
-      workingContent += `\n\n*Temukan lebih banyak [berita ${pillarLabel} terkini](${internalUrl}) hanya di Popshck.*`;
+      workingContent += `\n\n*Temukan lebih banyak [berita ${pillarLabel} terkini](${internalUrl}) hanya di Gameindo.*`;
       seoFixes.push('internal link');
     }
 

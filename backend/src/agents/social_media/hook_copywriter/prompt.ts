@@ -32,7 +32,7 @@ Respond with ONLY a valid JSON object — no markdown fences, no extra text, no 
 - 2-4 short punchy sentences. Get to the point fast.
 - Use 3-5 relevant emojis integrated naturally into the text (not just at the end).
 - End with 3-5 strategic hashtags relevant to the topic and pillar.
-- Hashtag format: mix Indonesian and international tags (e.g. #Esports #Popshck #GamingIndonesia).
+- Hashtag format: mix Indonesian and international tags (e.g. #Esports #Gameindo #GamingIndonesia).
 - Do NOT include the article URL in the caption — that's added separately.
 - Keep total caption under 200 characters for maximum engagement.
 

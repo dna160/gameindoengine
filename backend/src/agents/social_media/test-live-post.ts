@@ -173,7 +173,7 @@ async function main(): Promise<void> {
   };
 
   // Clean the title (strip site name suffix)
-  title = jinaData.data.title.replace(/\s*[–—-]\s*POPSHCK?K?.*$/i, '').trim();
+  title = jinaData.data.title.replace(/\s*[–—-]\s*GAMEINDO.*$/i, '').trim();
 
   // Extract article body: everything after the breadcrumb / before related posts
   // The article content starts after the first H1 duplicate and featured image
