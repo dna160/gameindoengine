@@ -135,6 +135,9 @@ export async function createCompletion(params: {
 // ── High-level chat helper ────────────────────────────────────────────────────
 
 const MAX_TOKENS_CAP   = 32000; // DeepSeek Flash supports up to 32K output tokens
+const MIN_TOKENS       = 4096;  // floor: never start a call below this — small
+                                // budgets (256, 300…) truncate constantly on V4
+                                // Flash and waste attempts doubling back up
 const MAX_ATTEMPTS     = 4;    // up to 3 token-doubling retries + 1 empty retry
 
 /**
@@ -149,7 +152,8 @@ export async function chat(
   messages: ChatMessage[],
   opts: { temperature?: number; maxTokens?: number } = {}
 ): Promise<string> {
-  let maxTokens = opts.maxTokens ?? 32000;
+  // Enforce a 4k floor so short-budget callers don't truncate + retry-doubling.
+  let maxTokens = Math.max(opts.maxTokens ?? MAX_TOKENS_CAP, MIN_TOKENS);
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     await rateLimiter.acquire();
