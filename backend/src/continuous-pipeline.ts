@@ -56,28 +56,52 @@ export async function runPipeline(): Promise<void> {
 
   const pollTimer = startRunIdPoll();
 
+  // Release the lock exactly once. The worker thread often posts its completion
+  // 'message' but never fires 'exit' — a dangling handle (e.g. an
+  // undisconnected PrismaClient) keeps its event loop alive — so relying on
+  // 'exit' alone leaves isRunning stuck true forever and every cron tick skips.
+  // Release on WHICHEVER of message/exit/error/watchdog fires first, and
+  // terminate the worker so it can't linger.
+  let released = false;
+  let watchdog: NodeJS.Timeout;
+  const release = (reason: string): void => {
+    if (released) return;
+    released = true;
+    clearInterval(pollTimer);
+    clearTimeout(watchdog);
+    isRunning = false;
+    currentRunId = null;
+    const w = worker;
+    worker = null;
+    if (w) { w.terminate().catch(() => {}); }
+    console.log(`[ContinuousPipeline] Lock released (${reason}).`);
+  };
+
+  // Backstop: never let a hung run (one that neither messages nor exits) hold
+  // the lock indefinitely. Force-release after PIPELINE_MAX_RUN_MS (default 2h).
+  const MAX_RUN_MS = Number(process.env.PIPELINE_MAX_RUN_MS) || 2 * 60 * 60 * 1000;
+  watchdog = setTimeout(() => {
+    console.error(`[ContinuousPipeline] Watchdog: run exceeded ${MAX_RUN_MS}ms — force-releasing lock.`);
+    release('watchdog timeout');
+  }, MAX_RUN_MS);
+
   worker.on('message', (msg) => {
     if (msg.success) {
       console.log(`[ContinuousPipeline] Worker done. runId=${msg.runId} articles=${msg.articlesProcessed}`);
     } else {
       console.error('[ContinuousPipeline] Worker error:', msg.error);
     }
+    release('worker message');
   });
 
   worker.on('exit', (code) => {
-    clearInterval(pollTimer);
     console.log(`[ContinuousPipeline] Worker thread exited with code ${code}`);
-    isRunning = false;
-    worker = null;
-    currentRunId = null;
+    release(`worker exit ${code}`);
   });
 
   worker.on('error', (err) => {
-    clearInterval(pollTimer);
     console.error('[ContinuousPipeline] Worker thread error:', err.message);
-    isRunning = false;
-    worker = null;
-    currentRunId = null;
+    release('worker error');
   });
 }
 
